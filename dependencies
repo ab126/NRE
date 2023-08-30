@@ -1,0 +1,12 @@
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+ordered-set
+npeet ( modified include, give proper reference, check copyright)
+networkx
+scipy
+datetime
+filterpy
+
