@@ -14,9 +14,10 @@ from .time_windowed import get_window
 
 
 # Kalman Filter Tools
-def plot_kalman_res(mat_x, mat_p, str_k='k'):
+def plot_kalman_res(mat_x, mat_p, str_k='k', fig=None):
     """Plots the Kalman Filter results: Mean states x and Covariance Matrix mat_p"""
-    fig = plt.figure()
+    if fig is None:
+        fig = plt.figure()
     ax = fig.add_subplot(1, 2, 1)
     im = ax.matshow(mat_x, cmap='YlOrBr')
     ax.set_title(r'$\hat{\mathbf{x}}_{' + str_k + '|' + str_k + '}$', fontsize=20)
@@ -70,6 +71,57 @@ def graph_evol(all_graphs, forget_factor):
     return curr_graphs
 
 
+def single_step_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat_p_init=None, mat_q=None, mat_r=None,
+                       k_steps=1, relief_factor=0.6, normalize=False):
+    """Given the functional connectivity graph mat_f, measurements and previous risk estimates, computes the current risk
+    estimates """
+
+    assert mat_f.shape[-1] == mat_f.shape[-2], 'Graph matrix is not square'
+    n_nodes = mat_f.shape[-1]
+    n_z = len(measurement) if measurement is not None else 1
+    if measurement is not None or mat_h is not None:
+        assert len(measurement) == mat_h.shape[0], 'Measurement dimensions mismatch'
+
+    # TODO: Must be a better way to assign them
+    if mat_x_init is None or mat_p_init is None:
+        mat_x_init = np.ones((n_nodes, 1))
+        mat_x_init = mat_x_init / np.linalg.norm(mat_x_init)
+        mat_p_init = np.eye(n_nodes) / 10 ** 1  # -1
+    if mat_q is None:
+        mat_q = np.eye(n_nodes, n_nodes) / 10 ** 3
+    if mat_r is None:
+        mat_r = np.eye(n_z, n_z) / 10 ** 2
+
+    mat_x_kf = mat_x_init.copy()
+    mat_p_kf = mat_p_init.copy()
+
+    # Kalman Filter
+    f = KalmanFilter(dim_x=n_nodes, dim_z=n_z)
+    for k in range(k_steps):
+        f.x = mat_x_kf
+        f.F = mat_f
+        f.P = mat_p_kf
+        f.Q = mat_q
+
+        f.predict()
+        if n_z > 0:
+            z = measurement
+            f.H = mat_h
+            f.R = mat_r
+            f.update(z)
+
+        mat_x_kf = f.x.copy() * (1 - relief_factor)
+        mat_p_kf = f.P.copy() * (1 - relief_factor) ** 2
+
+        # Normalization
+        if normalize:
+            c = np.linalg.norm(mat_x_kf)
+            mat_x_kf = mat_x_kf / c
+            mat_p_kf = mat_p_kf / (c ** 2)
+    return mat_x_kf, mat_p_kf
+
+
+# TODO: Add option to adjust initial estimate
 def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, w=None, k_steps=15, relief_factor=0.6,
                          normalize=False, sequential=False, whole_risks=True, return_cov=False):
     """
@@ -99,8 +151,8 @@ def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, w=No
     n_z_max = 1
     if all_measurements is not None or all_mat_h is not None:
         assert np.all([len(z) == mat_h.shape[0] for z, mat_h in
-                       zip(all_measurements, all_mat_h) if z is not None or mat_h is not None]),\
-                       'Measurement dimensions mismatch'
+                       zip(all_measurements, all_mat_h) if z is not None or mat_h is not None]), \
+            'Measurement dimensions mismatch'
         assert n_step == len(all_measurements) and n_step == len(all_mat_h), 'Measurement input mismatch'
         n_zs = [len(z) if z is not None else 0 for z in all_measurements]
         n_z_max = np.max(n_zs)

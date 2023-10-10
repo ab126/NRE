@@ -8,7 +8,7 @@ import scipy.fft
 from pomegranate.bayesian_network import BayesianNetwork
 from src.archive.bbn_functions import get_DAG_from_model
 
-MIN_SAMPLES = 5  # Minimum amount of samples required for MI calculation
+MIN_SAMPLES = 5  # Minimum number of samples required for MI calculation
 
 # TODO: Cant check CICFlowFeaatures, the csv file is gone... Unsure about Response Time, Packet Delay,
 #  Num Active Packets, Active Time. Other than that looks good
@@ -164,6 +164,10 @@ class NetworkModel:
         self.samples = np.array(samples, dtype='float')
         self.names = sub_net_names
         self.num_appearances = num_appearances
+
+    def read_stream(self):
+        """ A function to read stream of data"""
+        pass
 
     def apply_dft_mag(self):
         """Applies magnitude of fft to samples on nodes"""
