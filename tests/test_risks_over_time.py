@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from src.kalman_network_tools import graphs_2_risk_scores
-from src.network_model import NetworkModel
+from src.network_connectivity import ConnectivityUnit
 from src.network_plotting import risks_over_time_3d
 from src.preprocess import preprocess_df
 
@@ -19,7 +19,7 @@ with open(r'saves\victim_net.pickle', 'rb') as handle:
     entity_names = pickle.load(handle)
 print("Size of sub network: ", len(entity_names))
 
-nm = NetworkModel()
+nm = ConnectivityUnit()
 nm.read_flows(df, conn_param='Num Packets Received', entity_names=entity_names,
               window_type='time', sync_window_size=1.2, time_scale='sec')
 

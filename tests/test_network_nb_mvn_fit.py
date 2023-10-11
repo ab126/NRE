@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.random as nr
 
-from src.network_model import fit_mvn_to_samples
+from src.network_connectivity import fit_mvn_to_samples
 
 n = 8
 mu = nr.rand(n)

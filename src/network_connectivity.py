@@ -36,10 +36,9 @@ cic_conn_param_specs = {
 
 
 # TODO: Add measurement methods
-class NetworkModel:
+class ConnectivityUnit:
     """
-    Base Network Risk Estimation (NRE) Model.
-
+    Base unit for analyzing entity connectivity/relationships.
     """
 
     def __init__(self, loss_thr=9999):

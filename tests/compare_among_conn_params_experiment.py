@@ -3,7 +3,7 @@ import pickle
 
 from matplotlib import pyplot as plt
 
-from src.network_model import cic_conn_param_specs
+from src.network_connectivity import cic_conn_param_specs
 from src.preprocess import preprocess_df
 from src.analyze_cic_ids import compare_among_conn_params, plot_perf_comparison, nre_classification, \
     flow_based_classification

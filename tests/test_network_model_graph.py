@@ -6,7 +6,7 @@ import time
 from tqdm import tqdm
 import copy
 
-from src.network_model import NetworkModel, get_mat_f_q_from_covariance
+from src.network_connectivity import ConnectivityUnit, get_mat_f_q_from_covariance
 from src.preprocess import preprocess_df
 
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':  # TODO: Add test for connection size windowing
     print('File to df time (s): ', end - start)
 
     start = time.time()
-    nm = NetworkModel()
+    nm = ConnectivityUnit()
     nm.read_flows(df, entity_names=list(np.arange(5)), conn_param=None, window_type='time', sync_window_size=20,
                   time_scale='sec')
     end = time.time()

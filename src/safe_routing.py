@@ -12,7 +12,7 @@ from itertools import count
 
 from scipy.stats import multivariate_normal as mvn
 
-from src.network_model import get_all_entities
+from src.network_connectivity import get_all_entities
 
 
 def communication_graph_from_df(df, entity_names=None, keep_outsiders=True, src_id_col=' Source IP',

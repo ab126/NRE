@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 from src.kalman_network_tools import plot_kalman_res
 from src.preprocess import preprocess_df
-from src.real_time_model import NetworkModelUnit
+from src.real_time_model import NetworkModel
 from src.time_windowed import get_window
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Monday-WorkingHours.pcap_ISCX.csv'
@@ -15,7 +15,7 @@ df = preprocess_df(df_cic, date_col=' Timestamp')
 with open(r'saves\victim_net.pickle', 'rb') as handle:
     entity_names = pickle.load(handle)
 
-unit = NetworkModelUnit(entity_names)
+nm = NetworkModel(entity_names)
 end_of_df = False
 i = 0
 date_col = ' Timestamp'
@@ -34,8 +34,8 @@ while end_of_df is False:
     date_times.append(current_datetime)
     if current_datetime >= last_datetime:
         end_of_df = True
-    unit.update_new_tick(temp_df)
-    mat_x, mat_p = unit.mat_x, unit.mat_p
+    nm.update_new_tick(temp_df)
+    mat_x, mat_p = nm.mat_x, nm.mat_p
 
     plt.clf()
     plot_kalman_res(mat_x, mat_p, fig=fig)

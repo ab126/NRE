@@ -8,7 +8,7 @@ import seaborn as sns
 
 from matplotlib.lines import Line2D
 
-from src.network_model import NetworkModel
+from src.network_connectivity import ConnectivityUnit
 from src.time_windowed import get_window
 
 
@@ -56,7 +56,7 @@ def plot_entity_signal(df, entities, conn_param='Num Packets Rec', time_window=1
     t_df = pd.concat((t_df, cpy_df), ignore_index=True)
     t_df = t_df.sort_values(by=[date_col])
 
-    nm = NetworkModel()
+    nm = ConnectivityUnit()
     nm.read_flows(t_df, conn_param=conn_param, entity_names=list(entities), sync_window_size=time_window, time_scale=time_scale)
     vec1 = nm.samples[:, 0]
     vec2 = nm.samples[:, 1]
@@ -112,14 +112,14 @@ def plot_combined_flow_signals_old(df, entities, time_window=10, time_scale='min
     t_df = t_df.sort_values(by=[date_col])
 
     # 'Num Packets Rec'
-    nm = NetworkModel()
+    nm = ConnectivityUnit()
     nm.read_flows(t_df, conn_param=conn_param1, entity_names=list(entities), sync_window_size=time_window,
                   time_scale=time_scale)
     vec_num1 = nm.samples[:, 0]
     vec_num2 = nm.samples[:, 1] - 0.05
 
     # Activation
-    nm = NetworkModel()
+    nm = ConnectivityUnit()
     nm.read_flows(t_df, conn_param=conn_param2, entity_names=list(entities), sync_window_size=time_window,
                   time_scale=time_scale)
     vec_act1 = nm.samples[:, 0]
@@ -211,14 +211,14 @@ def plot_combined_flow_signals(df, entities, time_window=10, time_scale='min', d
     t_df = t_df.sort_values(by=[date_col])
 
     # Connection Parameter 1 (Activation)
-    nm = NetworkModel()
+    nm = ConnectivityUnit()
     nm.read_flows(t_df, conn_param=conn_param1, entity_names=list(entities), sync_window_size=time_window,
                   time_scale=time_scale)
     vec_conn1_ent1 = nm.samples[:, 0]
     vec_conn1_ent2 = nm.samples[:, 1] - 0.05
 
     # Connection Parameter 2
-    nm = NetworkModel()
+    nm = ConnectivityUnit()
     nm.read_flows(t_df, conn_param=conn_param2, entity_names=list(entities), sync_window_size=time_window,
                   time_scale=time_scale)
     vec_conn2_ent1 = nm.samples[:, 0]

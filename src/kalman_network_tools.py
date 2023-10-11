@@ -9,13 +9,15 @@ from PIL import Image
 from filterpy.kalman import KalmanFilter
 from matplotlib import pyplot as plt
 
-from .network_model import MIN_SAMPLES, NetworkModel, get_all_entities
+from .network_connectivity import MIN_SAMPLES, ConnectivityUnit, get_all_entities
 from .time_windowed import get_window
 
 
 # Kalman Filter Tools
 def plot_kalman_res(mat_x, mat_p, str_k='k', fig=None):
     """Plots the Kalman Filter results: Mean states x and Covariance Matrix mat_p"""
+    if len(mat_x.shape) <= 1:
+        mat_x = mat_x.reshape(len(mat_x), 1)
     if fig is None:
         fig = plt.figure()
     ax = fig.add_subplot(1, 2, 1)
@@ -71,7 +73,7 @@ def graph_evol(all_graphs, forget_factor):
     return curr_graphs
 
 
-# TODO: Simplifies related functions with single_step_update below
+# TODO: Simplifies related functions with single_step_update below, add docstring
 def single_step_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat_p_init=None, mat_q=None, mat_r=None,
                        k_steps=1, relief_factor=0.6, normalize=False):
     """
@@ -239,7 +241,7 @@ def score_evaluation(df, entity_names, w, conn_param='Num Packets Rec', batch_si
     time_scale_dict = {'sec': 's', 'min': 'min'}
     method_scores = []
     method_names = []
-    nm_base = NetworkModel()
+    nm_base = ConnectivityUnit()
     for win_type in window_types:
         for time_window in time_windows:
             nm_base.read_flows(df, conn_size=batch_size, conn_param=conn_param,
@@ -313,7 +315,7 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
     :param df: Canonical source dataframe that has flow information with timestamp, label and flow features.
         Each row is a flow
     :param entity_names: List of entities that the flows are constrained to
-    :param method: NetworkModel method for fitting the graph model to samples
+    :param method: ConnectivityUnit method for fitting the graph model to samples
     :param window_type: The windowing type, either 'time' or 'connection'.
     :param t_graph: Time window length that corresponds to a single state graph in time_scale units
     :param date_col: The dataframe df column that holds datetime timestamps of flows
@@ -331,7 +333,7 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
         as running
     :param return_datetimes: If True, returns starting datetimes of each graph calculation as well
     :param timeit: Record and return simulation running times as well
-    :param kwargs: NetworkModel.read_flows() keyword arguments
+    :param kwargs: ConnectivityUnit.read_flows() keyword arguments
 
     :return: all_graphs, labels, label_counts, date_times (optional), t_sim (optional)
         all_graphs: Collection of network state graphs
@@ -382,7 +384,7 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
             i += 1
             print(i) if verbose else None
 
-        nm = NetworkModel()
+        nm = ConnectivityUnit()
         delta_datetime = datetime.timedelta(minutes=t_graph) if time_scale == 'min' else datetime.timedelta(
             seconds=t_graph)
         window_last_datetime = temp_df[date_col].iloc[0] + delta_datetime
@@ -434,7 +436,7 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
 def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.6, return_cov=False, return_datetimes=False,
                          timeit=False, **kwargs):
     """
-    Returns the entity risks obtained from windowed NetworkModel
+    Returns the entity risks obtained from windowed ConnectivityUnit
 
     :param df: Canonical source dataframe that has flow information with timestamp, label and flow features.
         Each row is a flow
@@ -446,7 +448,7 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.6, re
     :param return_cov: If True, returns the recorded covariance matrix of risk estimates as well
     :param return_datetimes: If True, returns starting datetimes of each graph calculation as well
     :param timeit: Record and return simulation running times as well
-    :param kwargs: NetworkModel.read_flows() and parse_df_2_state_graphs keyword arguments
+    :param kwargs: ConnectivityUnit.read_flows() and parse_df_2_state_graphs keyword arguments
 
     :return: risk_mat, labels, label_counts, entity_names, all_cov (optional), date_times (optional), t_sim (optional)
         risk_mat: Collection of entity risk estimates

@@ -9,7 +9,7 @@ A Python API is offered for real-time operation.
 ## Python
 
 ### Installation
-NRE has been tested with Python 3.10 and requires:
+NRE has been tested with Python 3.10 and it requires:
 1. numpy
 2. pandas
 3. scikit-learn
@@ -30,41 +30,43 @@ pip install -r requirements.txt
 
 For beyond correlative entity relationship modelling, it
 also requires [npeet](https://github.com/gregversteeg/NPEET) 
-package which can be placed under [src](https://github.com/ab126/NRE/tree/main/src).
+package which is placed under [src](https://github.com/ab126/NRE/tree/main/src).
 
 
 ### Working Example
-This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/tests/test_working_example.py)
+This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/tests/test_working_example.py).
+
+First, the connection data is read from a source
+such as ".txt" file, and it is transformed to the desired format. For convenience, [CICFlowMeter](https://www.unb.ca/cic/research/applications.html#CICFlowMeter) [1]
+format has been opted for ".txt" template for the connection data.
+
 ```python
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import time
 
-from src.network_model import NetworkModel
-from src.preprocess import preprocess_df
+from matplotlib import pyplot as plt
 
-start = time.time()
+from src.kalman_network_tools import plot_kalman_res
+from src.preprocess import preprocess_df
+from src.real_time_model import NetworkModel
+
 df_raw = pd.read_csv('..\\test_flows.csv', header=0, encoding='cp1252')
 df = preprocess_df(df_raw, date_col=' Timestamp')
+```
+Next, NetworkModel instance is initialized with initial risk estimates.
 
-end = time.time()
-print('File to df time (s): ', end - start)
-
-start = time.time()
-nm = NetworkModel()
-nm.read_flows(df, entity_names=list(np.arange(5)), src_id_col=' Source ID', dst_id_col=' Destination ID',
-              src_feature_col=' Source Flow Attribute', dst_feature_col=' Destination Flow Attribute',
-              sync_window_size=20, time_scale='sec')
-end = time.time()
-print('\nDf to samples time (s): ', end - start, '\n')
-
-start = time.time()
-nm.fit_graph_model()
-nm.plot_f()
-end = time.time()
-print('\nSamples to Graph time (s): ', end - start)
-plt.title('Fitted Matrix F')
-print('\nNumber of Samples in Fitting:', nm.samples.shape[0])
+```python
+nm = NetworkModel(entity_names=list(np.arange(5)), mat_x_init= np.ones(5), mat_p_init=np.eye(5))
+```
+Then, the canonical connection data is fed through the model to estimate the risks at the new time tick. See [ConnectivityUnit.read_flows](https://github.com/ab126/NRE/blob/main/src/network_connectivity.py)
+for all the hyperparameters.
+```python
+nm.update_new_tick(df, src_id_col=' Source ID', dst_id_col=' Destination ID',
+                   src_feature_col=' Source Flow Attribute', dst_feature_col=' Destination Flow Attribute',
+                   sync_window_size=20, time_scale='sec', keep_unit=True)
+mat_x, mat_p = nm.mat_x, nm.mat_p
 ```
 
+# Reference
+1. Arash Habibi Lashkari, Gerard Draper-Gil, Mohammad Saiful Islam Mamun and Ali A. Ghorbani, "Characterization of Tor Traffic Using Time Based Features", In the proceeding of the 3rd International Conference on Information System Security and Privacy, SCITEPRESS, Porto, Portugal, 2017

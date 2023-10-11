@@ -14,7 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 
 from src.classification_tools import plot_roc_curves
-from src.network_model import get_mat_f_q_from_covariance
+from src.network_connectivity import get_mat_f_q_from_covariance
 from src.preprocess import preprocess_df
 from test_network_model_graph import generate_random_mvn_model, samples2flows
 

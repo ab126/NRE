@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from .preprocess import preprocess_df
 from .time_windowed import get_window
-from .network_model import MIN_SAMPLES, cic_conn_param_specs
+from .network_connectivity import MIN_SAMPLES, cic_conn_param_specs
 from .kalman_network_tools import get_risk_mat_from_df
 from .classification_tools import max_ba_operating_point, get_ba_from_operating_point, infer_roc
 

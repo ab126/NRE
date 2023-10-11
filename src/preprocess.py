@@ -47,7 +47,7 @@ def preprocess_df(df_input, date_col, dtype_dict=None):
     :param date_col: Column of df_input that will be mapped to datetime object and will be used for sorting rows.
     :param dtype_dict: (optional) Dictionary of column_name : dtype that specifies the formatting dtype of each column.
     :return:
-        df: Formatted df that can be used by NetworkModel object.
+        df: Formatted df that can be used by ConnectivityUnit object.
     """
     if dtype_dict is not None:
         df = convert_df(df_input, dtype_dict)

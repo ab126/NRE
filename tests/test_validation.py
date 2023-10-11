@@ -5,7 +5,7 @@ import numpy as np
 import seaborn as sns
 
 from src.preprocess import preprocess_df
-from src.network_model import NetworkModel
+from src.network_connectivity import ConnectivityUnit
 from src.analyze_cic_ids import nre_classification, flow_based_classification
 from src.classification_tools import plot_roc_curves
 
