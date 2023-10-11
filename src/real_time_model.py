@@ -20,13 +20,13 @@ class NetworkModelUnit:
         self.mat_q = mat_q
 
     # Prototypical update method
-    def update_new_tick(self, df_conn, measurement=None, mat_h=None, mat_r=None):
+    def update_new_tick(self, df_conn, measurement=None, mat_h=None, mat_r=None, **kwargs):
         """Update the risk estimates according to previous estimate"""
 
         df = preprocess_df(df_conn, date_col=' Timestamp')
         nm = NetworkModel()
-        nm.read_flows(df, conn_param='Num Packets Received', entity_names=self.entity_names,
-                      window_type='time', sync_window_size=self.sync_window_size, time_scale=self.time_scale)
+        nm.read_flows(df, entity_names=self.entity_names, window_type='time', sync_window_size=self.sync_window_size,
+                      time_scale=self.time_scale, **kwargs)
         nm.fit_graph_model(method='cov', verbose=True)
 
         self.mat_x, self.mat_p = single_step_update(nm.F, measurement=measurement, mat_h=mat_h, mat_x_init=self.mat_x,

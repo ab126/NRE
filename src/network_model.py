@@ -62,9 +62,9 @@ class NetworkModel:
 
     def read_flows(self, df, entity_names=None, window_type='time', date_col=' Timestamp', last_datetime=None,
                    sync_window_size=1.2, time_scale='sec', conn_size=50, src_id_col=' Source IP',
-                   dst_id_col=' Destination IP', conn_param='Num Packets Received',
+                   dst_id_col=' Destination IP', conn_param=None,
                    src_feature_col=' Total Fwd Packets',
-                   dst_feature_col=' Total Backward Packets', method='average'):
+                   dst_feature_col=' Total Backward Packets', method='total'):
         """
         Read flows from the DataFrame, computes the samples for the respective connection parameter
         ----------
@@ -333,7 +333,7 @@ class NetworkModel:
         if verbose is True:
             print('Conditioning number: ', cond_num, '\nDeterminant of F^T*F: ', d)
 
-    def plot_f(self, labels=False, cbar_font_size=16):
+    def plot_f(self, labels=True, cbar_font_size=16):
         """Plots the Adjacency matrix of the graph"""
         plt.matshow(self.F)
         cbar = plt.colorbar()

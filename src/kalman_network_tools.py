@@ -71,10 +71,13 @@ def graph_evol(all_graphs, forget_factor):
     return curr_graphs
 
 
+# TODO: Simplifies related functions with single_step_update below
 def single_step_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat_p_init=None, mat_q=None, mat_r=None,
                        k_steps=1, relief_factor=0.6, normalize=False):
-    """Given the functional connectivity graph mat_f, measurements and previous risk estimates, computes the current risk
-    estimates """
+    """
+    Given the functional connectivity graph mat_f, measurements and previous risk estimates, computes the current risk
+    estimates
+    """
 
     assert mat_f.shape[-1] == mat_f.shape[-2], 'Graph matrix is not square'
     n_nodes = mat_f.shape[-1]

@@ -99,5 +99,4 @@ if __name__ == '__main__':  # TODO: Add test for connection size windowing
     plt.matshow(cov)
     plt.colorbar()
     plt.title('True Covariance')
-
     plt.show()
