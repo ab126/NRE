@@ -68,5 +68,5 @@ nm.update_new_tick(df, src_id_col=' Source ID', dst_id_col=' Destination ID',
 mat_x, mat_p = nm.mat_x, nm.mat_p
 ```
 
-# Reference
+# References
 1. Arash Habibi Lashkari, Gerard Draper-Gil, Mohammad Saiful Islam Mamun and Ali A. Ghorbani, "Characterization of Tor Traffic Using Time Based Features", In the proceeding of the 3rd International Conference on Information System Security and Privacy, SCITEPRESS, Porto, Portugal, 2017

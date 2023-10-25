@@ -15,10 +15,10 @@ MIN_SAMPLES = 5  # Minimum number of samples required for MI calculation
 cic_conn_param_specs = {
     'Port Num': {'method': 'last', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
     'Protocol': {'method': 'last', 'src_feature_col': ' Protocol', 'dst_feature_col': ' Protocol'},
-    'Num Packets Sent': {'method': 'total', 'src_feature_col': ' Total Fwd Packets',
-                         'dst_feature_col': ' Total Backward Packets'},
-    'Num Packets Received': {'method': 'total', 'src_feature_col': ' Total Backward Packets',
-                             'dst_feature_col': ' Total Fwd Packets'},
+    'NPS': {'method': 'total', 'src_feature_col': ' Total Fwd Packets',
+                         'dst_feature_col': ' Total Backward Packets'},  # Number of Packets Sent
+    'NPR': {'method': 'total', 'src_feature_col': ' Total Backward Packets',
+                             'dst_feature_col': ' Total Fwd Packets'},  # Number of Packets Received
     'Packet Length': {'method': 'average', 'src_feature_col': ' Fwd Packet Length Mean',
                       'dst_feature_col': ' Bwd Packet Length Mean'},
     'Flow Duration': {'method': 'total', 'src_feature_col': ' Flow Duration', 'dst_feature_col': ' Flow Duration'},
