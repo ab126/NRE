@@ -35,7 +35,6 @@ cic_conn_param_specs = {
 }
 
 
-# TODO: Add measurement methods
 class ConnectivityUnit:
     """
     Base unit for analyzing entity connectivity/relationships.
