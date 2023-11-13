@@ -70,7 +70,7 @@ def remove_duplicate_fpr_tpr(fpr, tpr):
     return np.array(new_fpr), np.array(new_tpr)
 
 
-def infer_roc(fpr, tpr, n_points=100, deg=1, min_ro_points=2, far_point_mult=3.5, far_point_weight=0.005):
+def infer_roc(fpr, tpr, n_points=100, deg=1, min_ro_points=5, far_point_mult=1.35, far_point_weight=0.05):
     """
     Given Discrete ROC points infers a smooth ROC curve by fitting a line on logit transform of (fpr, tpr) points
     --------------
@@ -89,22 +89,27 @@ def infer_roc(fpr, tpr, n_points=100, deg=1, min_ro_points=2, far_point_mult=3.5
     fpr_t, tpr_t = fpr_t[1:-1], tpr_t[1:-1]  # Non-trivial operating points
 
     ind_x, ind_y = ~np.isinf(fpr_t), ~np.isinf(tpr_t)
-    fpr_op, tpr_op = fpr_t[ind_x], tpr_t[ind_y]  # Non-infinite operating points
+    fpr_op, tpr_op = fpr_t[ind_x], tpr_t[ind_y]  # Non-infinite operating coordinates
     if len(fpr_op) != 0 or len(tpr_op) != 0:
+        fpr_mean = np.mean(fpr_op) if len(fpr_op) != 0 else 0
+        tpr_mean = np.mean(tpr_op) if len(fpr_op) != 0 else 0
         far_point_coord = np.max(np.abs(np.concatenate((fpr_op, tpr_op)))) * far_point_mult
+        far_point_low = (-far_point_coord + fpr_mean, -far_point_coord + tpr_mean)
+        far_point_high = (far_point_coord + fpr_mean, far_point_coord + tpr_mean)
     else:
         far_point_coord = 1
+        far_point_low, far_point_high = (-far_point_coord, -far_point_coord), (far_point_coord, far_point_coord)
 
     # Replace inf coordinates with the "far points coordinates"
-    fpr_t[np.isneginf(fpr_t)] = -far_point_coord
-    fpr_t[np.isposinf(fpr_t)] = far_point_coord
-    tpr_t[np.isneginf(tpr_t)] = -far_point_coord
-    tpr_t[np.isposinf(tpr_t)] = far_point_coord
+    fpr_t[np.isneginf(fpr_t)] = far_point_low[0]  # -far_point_coord
+    fpr_t[np.isposinf(fpr_t)] = far_point_high[0]  # far_point_coord
+    tpr_t[np.isneginf(tpr_t)] = far_point_low[1]  # -far_point_coord
+    tpr_t[np.isposinf(tpr_t)] = far_point_high[1]  # far_point_coord
 
     sample_weights = np.ones(len(fpr_t))
     if len(fpr_t) < min_ro_points:  # Add far points
-        fpr_t = np.concatenate((np.array([-far_point_coord]), fpr_t, np.array([far_point_coord])))
-        tpr_t = np.concatenate((np.array([-far_point_coord]), tpr_t, np.array([far_point_coord])))
+        fpr_t = np.concatenate((np.array([far_point_low[0]]), fpr_t, np.array([far_point_high[0]])))
+        tpr_t = np.concatenate((np.array([far_point_low[1]]), tpr_t, np.array([far_point_high[1]])))
         sample_weights = np.concatenate((np.array([far_point_weight]), sample_weights, np.array([far_point_weight])))
 
     poly = PolynomialFeatures(degree=deg, include_bias=False)  # Bias term is included in LinearRegression instead
@@ -150,7 +155,7 @@ def plot_roc_curves(roc_curves, title, smooth_roc=True, show=False):
             tpr, fpr = add_disc_points(list(tpr), list(fpr))
             ax.plot(fpr, tpr, label=mdl)
 
-    plt.legend()
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     if show:

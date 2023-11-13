@@ -21,7 +21,7 @@ print(df.shape)
 with open('saves/victim_net.pickle', 'rb') as handle:
     entity_names = pickle.load(handle)
 
-with open('saves/partitioned_nodes_106.pickle', 'rb') as handle:
+with open('saves/partitioned_nodes_105.pickle', 'rb') as handle:
     subnet_names = pickle.load(handle)
 
 models = {'Linear Support Vector Machines': LinearSVC(dual='auto'), 'Decision Tree': DecisionTreeClassifier(),
