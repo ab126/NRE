@@ -21,17 +21,18 @@ def slice_runtime_df(df_run_time, col_name, col_val, col_sweep):
     return tt_df
 
 
-def fit_lines_runtimedf(tt_df, col_sweep):
-    "Fits a line to running times wrt. col_sweep"
+def fit_lines_runtime_df(tt_df, col_sweep):
+    """Fits a line to running times wrt the col_sweep"""
     y_lines = []
     x_lines = []
-    for mthd in np.unique(tt_df['Method']):
-        x = tt_df[tt_df['Method'] == mthd][col_sweep].values.reshape((-1, 1))
-        y = tt_df[tt_df['Method'] == mthd]['dt_sim'].values
+    for mtd in np.unique(tt_df['Method']):
+        x = tt_df[tt_df['Method'] == mtd][col_sweep].values.astype(float).reshape((-1, 1))
+        y = tt_df[tt_df['Method'] == mtd]['dt_sim'].values
 
         model = LinearRegression().fit(x, y)
-        x_line = np.unique(tt_df[col_sweep])
+        x_line = np.unique(tt_df[col_sweep]).astype(float)
         y_line = model.predict(x_line.reshape((-1, 1)))
         y_lines.append(y_line)
-        x_lines.append(map(str, x_line))
+        #x_lines.append(map(str, x_line))
+        x_lines.append(x_line.astype(str))  # Boxplot only accepts categorical variables
     return x_lines, y_lines

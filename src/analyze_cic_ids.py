@@ -410,7 +410,7 @@ def compare_among_conn_params(df, entity_names_nre, entity_names_fb=None, conn_p
         df_flow['Connection Parameter'] = [conn_param for _ in range(df_flow.shape[0])]
         df_flow['Classifier'] = df_flow.index
         df_flow.index = np.arange(df_flow.shape[0])
-        df_flow['Method'] = ['Flow-based State Inference' for _ in range(df_flow.shape[0])]
+        df_flow['Method'] = ['Flow-Based Network State Inference' for _ in range(df_flow.shape[0])]
 
         all_df = pd.concat((all_df, df_flow, df_nre), ignore_index=True)
     return all_df
@@ -436,5 +436,7 @@ def plot_perf_comparison(all_df, title='', perf_metric='Balanced Accuracy', peak
     plt.xticks(rotation=45, ha='right')
     plt.title(title)
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-
+    ax = plt.gca()
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
     return plt.gcf()

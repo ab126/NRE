@@ -158,6 +158,8 @@ def plot_roc_curves(roc_curves, title, smooth_roc=True, show=False):
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
     if show:
         plt.show()
     return fig
