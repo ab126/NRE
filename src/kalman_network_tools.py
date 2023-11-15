@@ -384,17 +384,17 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
             i += 1
             print(i) if verbose else None
 
-        nm = ConnectivityUnit()
+        cu = ConnectivityUnit()
         delta_datetime = datetime.timedelta(minutes=t_graph) if time_scale == 'min' else datetime.timedelta(
             seconds=t_graph)
         window_last_datetime = temp_df[date_col].iloc[0] + delta_datetime
-        nm.read_flows(temp_df, entity_names=entity_names, last_datetime=window_last_datetime, window_type=window_type,
+        cu.read_flows(temp_df, entity_names=entity_names, last_datetime=window_last_datetime, window_type=window_type,
                       date_col=date_col, time_scale=time_scale, **kwargs)
         if verbose:
-            print('Current time and samples shape: ', current_datetime, nm.samples.shape)
-        nm.fit_graph_model(method=method, verbose=False)  # cov
+            print('Current time and samples shape: ', current_datetime, cu.samples.shape)
+        cu.fit_graph_model(method=method, verbose=False)  # cov
 
-        g = nx.from_numpy_array(nm.F, create_using=nx.DiGraph)
+        g = nx.from_numpy_array(cu.F, create_using=nx.DiGraph)
         g = nx.relabel_nodes(g, {entity_names.index(node): node for node in entity_names})
         g.add_weighted_edges_from([(node, node, 1) for node in entity_names])
         temp_graph = np.asarray(nx.to_numpy_array(g, nodelist=entity_names))
@@ -464,16 +464,13 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.6, re
                                        timeit=timeit, **kwargs)
     out_vars = list(out_vars)
 
-    all_graphs, labels, label_counts, entity_names = out_vars[:4]
+    all_graphs, labels, label_counts, entity_names = out_vars[:4] #  First 4 are always same
     date_times = None
     t_sim = None
     if return_datetimes:
         date_times = out_vars.pop(4)
-        if timeit:
-            t_sim = out_vars.pop(4)
-    else:
-        if timeit:
-            t_sim = out_vars.pop(3)
+    if timeit:
+        t_sim = out_vars.pop(4)
 
     all_graphs = graph_evol(all_graphs, forget_factor)
     out_risk = graphs_2_risk_scores(all_graphs, k_steps=k_steps, relief_factor=relief_factor, normalize=True,
@@ -489,10 +486,10 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.6, re
     out_vars = [risk_mat, labels, label_counts, all_graphs, entity_names]
     if return_cov:
         out_vars.append(all_cov)
-        if return_datetimes:
-            out_vars.append(date_times)
-            if timeit:
-                out_vars.append(t_sim)
+    if return_datetimes:
+        out_vars.append(date_times)
+    if timeit:
+        out_vars.append(t_sim)
     return tuple(out_vars)
 
 
