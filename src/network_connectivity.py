@@ -1,3 +1,4 @@
+import matplotlib
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
@@ -333,7 +334,7 @@ class ConnectivityUnit:
 
     def plot_f(self, labels=True, cbar_font_size=16):
         """Plots the Adjacency matrix of the graph"""
-        plt.matshow(self.F)
+        plt.matshow(self.F, cmap='Blues')
         cbar = plt.colorbar()
         cbar.ax.tick_params(labelsize=cbar_font_size)
         if labels:
