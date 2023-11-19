@@ -343,10 +343,10 @@ def risks_over_time_3d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Es
     p_min = np.min(np.array(mat_p_list))
     p_max = np.max(np.array(mat_p_list))
 
-    cmap_p = plt.cm.YlGnBu
     cmap_x = plt.cm.YlOrBr
-    norm_p = matplotlib.colors.Normalize(vmin=np.abs(p_min), vmax=p_max)
+    cmap_p = plt.cm.YlGnBu
     norm_x = matplotlib.colors.Normalize(vmin=np.abs(x_min), vmax=x_max)
+    norm_p = matplotlib.colors.Normalize(vmin=np.abs(p_min), vmax=p_max)
 
     for k, x_kf, p_kf in zip(np.arange(k_steps), mat_x_list, mat_p_list):
         y_x, z_x = np.meshgrid(np.arange(2) - shift, np.arange(n_nodes)[::-1])
@@ -411,7 +411,7 @@ def risks_over_time_3d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Es
     ax_p.set_zlabel('Entity Index', fontsize=24, labelpad=15, rotation=-90)
     ax_p.set_ylabel('Entity Index', fontsize=24, labelpad=15)
 
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.suptitle(title, fontsize=30)
     if save_name is not None:
         plt.savefig(save_name)  # , transparent=True)
@@ -419,10 +419,9 @@ def risks_over_time_3d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Es
     return fig
 
 
-def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Estimates',
-                       save_name='temp_plot.jpg'):
+def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='', save_name='temp_plot.jpg'):
     """
-    Plots the risk estimates overtime
+    Plots the risk estimates overtime, 2d layout
 
     :param mat_x_list: List of mean of the estimates
     :param mat_p_list: List of covariance matrices of the risk estimates
@@ -436,17 +435,17 @@ def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Es
     assert k_steps > 0
 
     fig = plt.figure(figsize=(16, 8))
-    spec = fig.add_gridspec(3, k_steps + 2, height_ratios=[.1, 1.6, 3], width_ratios=[.25] + [1 for _ in range(k_steps)] + [.5], hspace=.4, wspace=.4)
+    spec = fig.add_gridspec(3, k_steps + 2, height_ratios=[.1, 1.6, 3], width_ratios=[.25] + [1 for _ in range(k_steps)] + [.5], hspace=.6, wspace=.4)
 
     x_min = np.min(np.array(mat_x_list))
     x_max = np.max(np.array(mat_x_list))
     p_min = np.min(np.array(mat_p_list))
     p_max = np.max(np.array(mat_p_list))
 
-    cmap_p = plt.cm.BuGnBu
-    cmap_x = plt.cm.BuOrBr
-    norm_p = matplotlib.colors.Normalize(vmin=np.abs(p_min), vmax=p_max)
+    cmap_x = plt.cm.YlOrBr  # YlOrBr
+    cmap_p = plt.cm.YlGnBu  # YlGnBu
     norm_x = matplotlib.colors.Normalize(vmin=np.abs(x_min), vmax=x_max)
+    norm_p = matplotlib.colors.Normalize(vmin=np.abs(p_min), vmax=p_max)
 
     # t axis
     ax_t = fig.add_subplot(spec[0, :])

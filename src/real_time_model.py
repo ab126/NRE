@@ -1,6 +1,6 @@
 from src.preprocess import preprocess_df
 from src.network_connectivity import ConnectivityUnit
-from src.kalman_network_tools import single_step_update
+from src.kalman_network_tools import single_risk_update
 
 
 # TODO: Write a class that implements all the necessary functions for a single graph window in another module
@@ -46,6 +46,6 @@ class NetworkModel:
         if keep_unit:
             self.cu = cu
 
-        self.mat_x, self.mat_p = single_step_update(cu.F, measurement=measurement, mat_h=mat_h, mat_x_init=self.mat_x,
+        self.mat_x, self.mat_p = single_risk_update(cu.F, measurement=measurement, mat_h=mat_h, mat_x_init=self.mat_x,
                                                     mat_p_init=self.mat_p, mat_q=self.mat_q, mat_r=mat_r, k_steps=1,
                                                     relief_factor=relief_factor, normalize=False)

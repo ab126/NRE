@@ -74,11 +74,35 @@ def graph_evol(all_graphs, forget_factor):
 
 
 # TODO: Simplifies related functions with single_step_update below, add docstring
-def single_step_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat_p_init=None, mat_q=None, mat_r=None,
+def single_risk_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat_p_init=None, mat_q=None, mat_r=None,
                        k_steps=1, relief_factor=0.6, normalize=False):
     """
     Given the functional connectivity graph mat_f, measurements and previous risk estimates, computes the current risk
     estimates
+
+    :param mat_f: Network state graph.
+    2D array of size [n_nodes, n_nodes]
+    :param measurement: Measurement z for each the calculated graph
+    1D array of size [n_z]
+    :param mat_h: Observation matrix that indicates the measured entity
+    2D array of size [n_z, n_nodes]
+    :param mat_x_init: Initial risk estimate
+    1D array of size [n_nodes]
+    :param mat_p_init: Initial risk estimate error covariance matrix
+    2D array of size [n_nodes, n_nodes]
+    :param mat_q: System noise covariance matrix
+    2D array of size [n_nodes, n_nodes]
+    :param mat_r: Measurement noise covariance matrix
+    2D array of size [n_z, n_z]
+    :param k_steps: Number of Kalman Filter Steps to be used in calculating risk estimates.
+    See the paper for more.
+    :param relief_factor: Percentage of the risk relieved at each time step for each node
+    See the paper for more.
+    :param normalize: If True, normalizes risks at each step
+
+    :return mat_x_kf, mat_p_kf:
+        mat_x_kf: Calculated Risk Estimates mean
+        mat_p_kf: Calculated Risk Estimates error covariance matrix
     """
 
     assert mat_f.shape[-1] == mat_f.shape[-2], 'Graph matrix is not square'
@@ -87,7 +111,7 @@ def single_step_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat
     if measurement is not None or mat_h is not None:
         assert len(measurement) == mat_h.shape[0], 'Measurement dimensions mismatch'
 
-    # TODO: Must be a better way to assign them
+    # Initializations
     if mat_x_init is None or mat_p_init is None:
         mat_x_init = np.ones((n_nodes, 1))
         mat_x_init = mat_x_init / np.linalg.norm(mat_x_init)
@@ -126,97 +150,90 @@ def single_step_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat
     return mat_x_kf, mat_p_kf
 
 
-# TODO: Add option to adjust initial estimate
-def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, w=None, k_steps=15, relief_factor=0.6,
-                         normalize=False, sequential=False, whole_risks=True, return_cov=False):
+def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, mat_x_init=None, mat_p_init=None,
+                         all_mat_q=None, all_mat_r=None, k_steps=15, relief_factor=0.6, normalize=False,
+                         sequential=False, whole_risks=True, w=None, return_cov=False):
     """
-    Given graphs, returns the scores according to weights w. Runs kalman filter 
-    for k_steps steps
+    Given graphs, returns the scores according to weights w. Runs kalman filter for k_steps steps
 
-    :param all_graphs: Array of all network state graphs [.,:,:]
+    :param all_graphs: List of all network state graphs
+    List of 2D array of size [n_nodes, n_nodes]
     :param all_measurements: List of measurements for each step the graph is calculated
+    List of 1D array of size [n_z]
     :param all_mat_h: List of observation matrices that indicate the measured entity
-    :param w: Weight matrix to be used if returning weighted sum of risks
-    :param k_steps: Number of Kalman Filter Steps to be used in calculating risk estimates. See the paper for more.
-    :param relief_factor: Percentage of the risk relieved at each time step for each node (see the paper for more).
+    List of 2D array of size [n_z, n_nodes]
+    :param mat_x_init: Initial risk estimate
+    1D array of size [n_nodes]
+    :param mat_p_init: Initial risk estimate error covariance matrix
+    2D array of size [n_nodes, n_nodes]
+    :param all_mat_q: All system noise covariance matrices
+    List of 2D array of size [n_nodes, n_nodes]
+    :param all_mat_r: All measurement noise covariance matrices
+    List of 2D array of size [n_z, n_z]
+
+    :param k_steps: Number of Kalman Filter Steps to be used in calculating risk estimates.
+    See the paper for more.
+    :param relief_factor: Percentage of the risk relieved at each time step for each node.
+    See the paper for more.
     :param normalize: If True, normalizes risks at each step
     :param sequential: If True, uses the previous graph's risk estimates as prior risk estimates for current step; else,
         initializes risk prior to uninformative uniform prior for each graph
     :param whole_risks: If True, returns risks of all entities in the network; else, returns the weighted sum according
         to w
+    :param w: Weight matrix to be used if returning weighted sum of risks
     :param return_cov: If True, returns the recorded covariance matrix of risk estimates as well
+
+    :return all_means, all_cov (optional):
+        mat_x_kf: All calculated Risk Estimates means
+        mat_p_kf: All calculated Risk Estimates error covariance matrices
     """
     if w is None:
         w = np.array([])
 
-    assert all_graphs.shape[-1] == all_graphs.shape[-2], 'Graph matrix is not square'
-    n_nodes = all_graphs.shape[-1]
-    n_step = all_graphs.shape[0]  # Number of graph steps
-    n_zs = [0 for _ in all_graphs]
-    n_z_max = 1
+    assert np.all(graph.shape[-1] == graph.shape[-2] for graph in all_graphs), 'Graph matrix is not square'
+    n_nodes = all_graphs[-1].shape[-1]
+    n_step = len(all_graphs)
+
     if all_measurements is not None or all_mat_h is not None:
         assert np.all([len(z) == mat_h.shape[0] for z, mat_h in
                        zip(all_measurements, all_mat_h) if z is not None or mat_h is not None]), \
             'Measurement dimensions mismatch'
         assert n_step == len(all_measurements) and n_step == len(all_mat_h), 'Measurement input mismatch'
-        n_zs = [len(z) if z is not None else 0 for z in all_measurements]
-        n_z_max = np.max(n_zs)
 
-    mat_x_init = np.ones((n_nodes, 1))
-    mat_x_init = mat_x_init / np.linalg.norm(mat_x_init)
-    mat_p_init = np.eye(n_nodes) / 10 ** 1  # -1
-    mat_q = np.eye(n_nodes, n_nodes) / 10 ** 3  # 1
+    # Initializations
+    if mat_x_init is None or mat_p_init is None:
+        mat_x_init = np.ones((n_nodes, 1))
+        mat_x_init = mat_x_init / np.linalg.norm(mat_x_init)
+        mat_p_init = np.eye(n_nodes) / 10 ** 1  # -1
+    if all_mat_q is None:
+        all_mat_q = [np.eye(n_nodes, n_nodes) / 10 ** 3 for _ in range(n_step)]
+    if all_mat_r is None:
+        all_mat_r = [np.eye(1, 1) / 10 ** 2 for _ in range(n_step)]
 
     mat_x_kf = mat_x_init.copy()
     mat_p_kf = mat_p_init.copy()
-    all_scores = [mat_x_kf]
+    all_means = [mat_x_kf]
     all_cov = [mat_p_kf]
     for i in range(n_step):
-        mat_f = all_graphs[i, :, :].copy()
-
         # Kalman Filter
         if not sequential:
             mat_x_kf = mat_x_init.copy()
             mat_p_kf = mat_p_init.copy()
 
-        f = KalmanFilter(dim_x=n_nodes, dim_z=n_z_max)
-        for k in range(k_steps):  # TODO: Observation ?
-            """ 
-            # Observation
-            v = np.random.multivariate_normal(np.zeros(n_z), mat_r)
-            z = np.matmul(mat_h, np.ones(N)*0.3)# + np.reshape(v, (-1, 1)) # Safe node
-            """
-            n_z = n_zs[i]
-            f.x = mat_x_kf
-            f.F = mat_f
-            f.P = mat_p_kf
-            f.Q = mat_q
-
-            f.predict()
-            if n_z > 0:
-                z = all_measurements[i]
-                f.H = all_mat_h[i]
-                f.R = np.eye(n_z, n_z) / 10 ** 2
-                f.update(z)
-
-            mat_x_kf = f.x.copy() * (1 - relief_factor)
-            mat_p_kf = f.P.copy() * (1 - relief_factor) ** 2
-
-            # Normalization
-            if normalize:
-                c = np.linalg.norm(mat_x_kf)
-                mat_x_kf = mat_x_kf / c
-                mat_p_kf = mat_p_kf / (c ** 2)
+        mat_x_kf, mat_p_kf = single_risk_update(all_graphs[i], measurement=all_measurements[i],
+                                                mat_h=all_mat_h[i], mat_x_init=mat_x_kf, mat_p_init=mat_p_kf,
+                                                mat_q=all_mat_q[i], mat_r=all_mat_r[i],
+                                                k_steps=k_steps, relief_factor=relief_factor, normalize=normalize)
 
         if whole_risks:
-            all_scores.append(mat_x_kf)
+            all_means.append(mat_x_kf)
             all_cov.append(mat_p_kf)
         else:
             sum_score, sum_var = sum_scores(w, mat_x_kf, mat_p_kf)
-            all_scores.append(float(sum_score))
+            all_means.append(float(sum_score))
             all_cov.append(mat_p_kf)
 
-    out_vars = all_scores
+    out_vars = all_means
     if return_cov:
         out_vars = out_vars, all_cov
     return out_vars
@@ -464,7 +481,7 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.6, re
                                        timeit=timeit, **kwargs)
     out_vars = list(out_vars)
 
-    all_graphs, labels, label_counts, entity_names = out_vars[:4] #  First 4 are always same
+    all_graphs, labels, label_counts, entity_names = out_vars[:4]  # First 4 are always same
     date_times = None
     t_sim = None
     if return_datetimes:
