@@ -411,7 +411,7 @@ def risks_over_time_3d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Es
     ax_p.set_zlabel('Entity Index', fontsize=24, labelpad=15, rotation=-90)
     ax_p.set_ylabel('Entity Index', fontsize=24, labelpad=15)
 
-    #plt.tight_layout()
+    # plt.tight_layout()
     plt.suptitle(title, fontsize=30)
     if save_name is not None:
         plt.savefig(save_name)  # , transparent=True)
@@ -419,12 +419,13 @@ def risks_over_time_3d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Es
     return fig
 
 
-def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='', save_name='temp_plot.jpg'):
+def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save_name='temp_plot.jpg'):
     """
     Plots the risk estimates overtime, 2d layout
 
     :param mat_x_list: List of mean of the estimates
     :param mat_p_list: List of covariance matrices of the risk estimates
+    :param mat_f: Connectivity Graph Matrix F
     :param t_graph: Separation of time ticks in seconds
     :param title: Title of the plot
     :param save_name: If provided, saves the plot with this file name and extension
@@ -434,8 +435,9 @@ def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='', save_name='
     k_steps = len(mat_x_list)
     assert k_steps > 0
 
-    fig = plt.figure(figsize=(16, 8))
-    spec = fig.add_gridspec(3, k_steps + 2, height_ratios=[.1, 1.6, 3], width_ratios=[.25] + [1 for _ in range(k_steps)] + [.5], hspace=.6, wspace=.4)
+    fig = plt.figure(figsize=(22, 8))
+    spec = fig.add_gridspec(3, k_steps + 3, height_ratios=[.1, 1.6, 3],
+                            width_ratios=[1.5, .75] + [1 for _ in range(k_steps)] + [.5], hspace=.6, wspace=.4)
 
     x_min = np.min(np.array(mat_x_list))
     x_max = np.max(np.array(mat_x_list))
@@ -444,31 +446,47 @@ def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='', save_name='
 
     cmap_x = plt.cm.YlOrBr  # YlOrBr
     cmap_p = plt.cm.YlGnBu  # YlGnBu
+    cmap_f = 'Blues'
     norm_x = matplotlib.colors.Normalize(vmin=np.abs(x_min), vmax=x_max)
     norm_p = matplotlib.colors.Normalize(vmin=np.abs(p_min), vmax=p_max)
+    norm_f = matplotlib.colors.Normalize(vmin=np.min(mat_f), vmax=np.max(mat_f))
+
+    # Connectivity Graph
+    ax_f = fig.add_subplot(spec[:, 0])
+    ax_f.matshow(mat_f, cmap='Blues')
+    cbar_f = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_f, cmap=cmap_f), ax=ax_f, shrink=0.4)
+    cbar_f.ax.tick_params(labelsize=16)
+    ax_f.set_title(r'$\mathbf{F}^{(t)}$', fontsize=20)
+    ax_f.set_xlabel('Entity Index', weight='bold', fontsize=16)
+    ax_f.set_ylabel('Entity Index', weight='bold', fontsize=16)
+    ax_f = plt.gca()
+    ax_f.xaxis.set_ticks_position('bottom')
 
     # t axis
-    ax_t = fig.add_subplot(spec[0, :])
+    ax_t = fig.add_subplot(spec[0, 1:])
     ax_t.plot(1, 0, ls="", marker=">", ms=10, color="k", clip_on=False)
     ax_t.plot([0, 1], [0, 0], 'k')
     # Ticks
     xts = [.1, .29, .48, .67, .86]
+    shift = 0.08 # How much to shift the start of the time line
     for k, xt in enumerate(xts):
         ax_t.plot([xt, xt], [-1, 1], 'k')
-        ax_t.text(xt, -2, str(k*t_graph), clip_on=False, fontsize=18, ha="center", va="top")
+        ax_t.text(xt, -2, str(k * t_graph), clip_on=False, fontsize=18, ha="center", va="top")
     ax_t.text(1.01, 0, "t (s)", ha="left", va="center", fontsize=20, clip_on=False)
-    #ax_t.set_xlim([0, 1])
+    x_low, x_high = ax_t.get_xlim()
+    ax_t.set_xlim([x_low - shift, x_high])
     ax_t.axis("off")
 
     # x_k
     x_axs = []
-    ax_x_0 = fig.add_subplot(spec[1, 0])
+    ax_x_0 = fig.add_subplot(spec[1, 1])
     x_axs.append(ax_x_0)
     ax_x_0.axis('off')
-    ax_x_0.text(0.5, 0.5, r'$\hat{\mathbf{x}}_{t|t}$', fontsize=26, ha="center", va="center")
+    ax_x_0.text(0.5, 0.5, r'$\hat{\mathbf{x}}_{t|t}$:', fontsize=26, ha="center", va="center")
+    ax_x_0.set_xlim([0, 0.7])
 
     for k, x_kf, p_kf in zip(np.arange(k_steps) + 1, mat_x_list, mat_p_list):
-        ax_x_k = fig.add_subplot(spec[1, k])
+        ax_x_k = fig.add_subplot(spec[1, k+1])
         x_axs.append(ax_x_k)
         ax_x_k.matshow(x_kf, vmin=x_min, vmax=x_max, cmap=cmap_x)
 
@@ -483,18 +501,21 @@ def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='', save_name='
 
     ax_x_last = fig.add_subplot(spec[1, -1])
     ax_x_last.axis('off')
-    cbar_x = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_x, cmap=cmap_x), ax=ax_x_last, location='left', shrink=1.2)#, pad=-20)
-    cbar_x.set_label('Mean of Risk\nEstimates '+r'($\hat{\mathbf{x}}_{t|t}$)', fontsize=20, rotation=-90, labelpad=-40)
+    cbar_x = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_x, cmap=cmap_x), ax=ax_x_last, location='left',
+                          shrink=1.2)  # , pad=-20)
+    cbar_x.set_label('Mean of Risk\nEstimates ' + r'($\hat{\mathbf{x}}_{t|t}$)', fontsize=20, rotation=-90,
+                     labelpad=-40)
     cbar_x.ax.tick_params(labelsize=18)
     cbar_x.ax.yaxis.offsetText.set(size=18)
 
     # P_kf
-    ax_p_0 = fig.add_subplot(spec[2, 0])
+    ax_p_0 = fig.add_subplot(spec[2, 1])
     ax_p_0.axis('off')
-    ax_p_0.text(0.5, 0.5, r'$\mathbf{P}_{t|t}$', fontsize=26, ha="center", va="center")
+    ax_p_0.text(0.5, 0.5, r'$\mathbf{P}_{t|t}$:', fontsize=26, ha="center", va="center")
+    ax_p_0.set_xlim([0, 0.7])
 
     for k, x_kf, p_kf in zip(np.arange(k_steps) + 1, mat_x_list, mat_p_list):
-        ax_p_k = fig.add_subplot(spec[2, k])
+        ax_p_k = fig.add_subplot(spec[2, k+1])
         ax_p_k.matshow(p_kf, vmin=p_min, vmax=p_max, cmap=cmap_p)
 
         if k == k_steps:
@@ -511,13 +532,12 @@ def risks_over_time_2d(mat_x_list, mat_p_list, t_graph=20, title='', save_name='
 
     ax_p_last = fig.add_subplot(spec[2, -1])
     ax_p_last.axis('off')
-    cbar_p = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_p, cmap=cmap_p), ax=ax_p_last, shrink=1)#, pad=-10)
-    cbar_p.set_label('Covariance\nMatrix '+r'($\mathbf{P}_{t|t}$)', fontsize=20, rotation=-90, labelpad=50)
+    cbar_p = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_p, cmap=cmap_p), ax=ax_p_last, shrink=1)  # , pad=-10)
+    cbar_p.set_label('Covariance\nMatrix ' + r'($\mathbf{P}_{t|t}$)', fontsize=20, rotation=-90, labelpad=50)
     cbar_p.ax.yaxis.set_ticks_position('left')
     cbar_p.ax.tick_params(labelsize=18)
     cbar_p.ax.yaxis.offsetText.set(size=18)
 
-    #plt.tight_layout()
     plt.suptitle(title, fontsize=30)
     if save_name is not None:
         plt.savefig(save_name)  # , transparent=True)
