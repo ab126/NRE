@@ -419,7 +419,8 @@ def risks_over_time_3d(mat_x_list, mat_p_list, t_graph=20, title='Sample Risk Es
     return fig
 
 
-def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save_name='temp_plot.jpg'):
+def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save_name='temp_plot.jpg',
+                       show_border=False):
     """
     Plots the risk estimates overtime, 2d layout
 
@@ -429,15 +430,16 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     :param t_graph: Separation of time ticks in seconds
     :param title: Title of the plot
     :param save_name: If provided, saves the plot with this file name and extension
+    :param show_border: Show some borders for fixing layout
     :return fig: Figure handle of the plot
     """
     n_nodes = mat_x_list[-1].shape[0]
     k_steps = len(mat_x_list)
     assert k_steps > 0
 
-    fig = plt.figure(figsize=(22, 8))
-    spec = fig.add_gridspec(3, k_steps + 3, height_ratios=[.1, 1.6, 3],
-                            width_ratios=[1.5, .75] + [1 for _ in range(k_steps)] + [.5], hspace=.6, wspace=.4)
+    fig = plt.figure(figsize=(22, 6))
+    spec = fig.add_gridspec(3, k_steps + 3, height_ratios=[.4, 2, 2.4],
+                            width_ratios=[1.5, .75] + [1 for _ in range(k_steps)] + [.5], hspace=0, wspace=.4)
 
     x_min = np.min(np.array(mat_x_list))
     x_max = np.max(np.array(mat_x_list))
@@ -475,20 +477,26 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     ax_t.text(1.01, 0, "t (s)", ha="left", va="center", fontsize=20, clip_on=False)
     x_low, x_high = ax_t.get_xlim()
     ax_t.set_xlim([x_low - shift, x_high])
-    ax_t.axis("off")
+    ax_t.set_ylim([-5, 5])
+    if not show_border:
+        ax_t.axis("off")
 
     # x_k
     x_axs = []
     ax_x_0 = fig.add_subplot(spec[1, 1])
     x_axs.append(ax_x_0)
-    ax_x_0.axis('off')
+    if not show_border:
+        ax_x_0.axis('off')
     ax_x_0.text(0.5, 0.5, r'$\hat{\mathbf{x}}_{t|t}$:', fontsize=26, ha="center", va="center")
     ax_x_0.set_xlim([0, 0.7])
 
     for k, x_kf, p_kf in zip(np.arange(k_steps) + 1, mat_x_list, mat_p_list):
         ax_x_k = fig.add_subplot(spec[1, k+1])
         x_axs.append(ax_x_k)
-        ax_x_k.matshow(x_kf, vmin=x_min, vmax=x_max, cmap=cmap_x)
+        if k != 1 and show_border:
+            ax_x_k.matshow(x_kf, vmin=x_min, vmax=x_max, cmap=cmap_x)
+        else:
+            ax_x_k.matshow(x_kf, vmin=x_min, vmax=x_max, cmap=cmap_x)
 
         if k == k_steps:
             ax_x_k.set_ylabel('Entity Index', fontsize=16, labelpad=20, rotation=-90)
@@ -510,13 +518,18 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
 
     # P_kf
     ax_p_0 = fig.add_subplot(spec[2, 1])
-    ax_p_0.axis('off')
+    if not show_border:
+        ax_p_0.axis('off')
     ax_p_0.text(0.5, 0.5, r'$\mathbf{P}_{t|t}$:', fontsize=26, ha="center", va="center")
     ax_p_0.set_xlim([0, 0.7])
 
     for k, x_kf, p_kf in zip(np.arange(k_steps) + 1, mat_x_list, mat_p_list):
         ax_p_k = fig.add_subplot(spec[2, k+1])
-        ax_p_k.matshow(p_kf, vmin=p_min, vmax=p_max, cmap=cmap_p)
+
+        if k != 1 and show_border:
+            ax_p_k.matshow(p_kf, vmin=p_min, vmax=p_max, cmap=cmap_p)
+        else:
+            ax_p_k.matshow(p_kf, vmin=p_min, vmax=p_max, cmap=cmap_p)
 
         if k == k_steps:
             ax_p_k.set_ylabel('Entity Index', fontsize=18, labelpad=20, rotation=-90)
@@ -538,7 +551,8 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     cbar_p.ax.tick_params(labelsize=18)
     cbar_p.ax.yaxis.offsetText.set(size=18)
 
-    plt.suptitle(title, fontsize=30)
+    spec.tight_layout(fig)
+    #plt.suptitle(title, fontsize=30)
     if save_name is not None:
         plt.savefig(save_name)  # , transparent=True)
     plt.show()

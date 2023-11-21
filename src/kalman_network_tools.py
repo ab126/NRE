@@ -201,9 +201,10 @@ def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, mat_
         assert n_step == len(all_measurements) and n_step == len(all_mat_h), 'Measurement input mismatch'
 
     # Initializations
-    if mat_x_init is None or mat_p_init is None:
+    if mat_x_init is None:
         mat_x_init = np.ones((n_nodes, 1))
         mat_x_init = mat_x_init / np.linalg.norm(mat_x_init)
+    if mat_p_init is None:
         mat_p_init = np.eye(n_nodes) / 10 ** 1  # -1
     if all_mat_q is None:
         all_mat_q = [np.eye(n_nodes, n_nodes) / 10 ** 3 for _ in range(n_step)]
