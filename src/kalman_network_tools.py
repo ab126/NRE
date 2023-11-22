@@ -221,10 +221,12 @@ def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, mat_
             mat_x_kf = mat_x_init.copy()
             mat_p_kf = mat_p_init.copy()
 
-        mat_x_kf, mat_p_kf = single_risk_update(all_graphs[i], measurement=all_measurements[i],
-                                                mat_h=all_mat_h[i], mat_x_init=mat_x_kf, mat_p_init=mat_p_kf,
-                                                mat_q=all_mat_q[i], mat_r=all_mat_r[i],
-                                                k_steps=k_steps, relief_factor=relief_factor, normalize=normalize)
+        measurement = all_measurements[i] if all_measurements is not None else None
+        mat_h = all_mat_h[i] if all_mat_h is not None else None
+        mat_x_kf, mat_p_kf = single_risk_update(all_graphs[i], measurement=measurement, mat_h=mat_h,
+                                                mat_x_init=mat_x_kf, mat_p_init=mat_p_kf, mat_q=all_mat_q[i],
+                                                mat_r=all_mat_r[i], k_steps=k_steps, relief_factor=relief_factor,
+                                                normalize=normalize)
 
         if whole_risks:
             all_means.append(mat_x_kf)

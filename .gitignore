@@ -2,3 +2,5 @@
 /tests/figures/
 /tests/saves/
 
+/tests/draw_network.ipynb
+/tests/classification_experiment.ipynb
