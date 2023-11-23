@@ -1,10 +1,11 @@
 import copy
+import warnings
+
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.special import expit, logit
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
-
 
 marker_rotation = ['o', 'X', 's', '*', 'v', '2']
 
@@ -186,16 +187,27 @@ def max_ba_operating_point(fpr_roc, tpr_roc, eps=0.05, fpr_init=0.1, max_iter=1_
 
     i = 0
     err = 1
+    conv_bool = False
     x_curr = fpr_init
     y_curr = y_roc[_locate_closest(x_roc, x_curr)]
     while err > eps and i < max_iter:
         y_tan = y_curr + (x_roc - x_curr)
 
         x_inter, y_inter = _find_intersects_numerically(x_roc, y_roc, y_tan, eps=eps / 10)
+        if len(x_inter) == 0:
+            warnings.warn("No intersection point found.")
+            conv_bool = False
+            break
         if len(x_inter) == 1:
             x_curr, y_curr = x_inter[0], y_inter[0]
+            conv_bool = True
             break
-        assert len(x_inter) == 2, "Expected intersection points was 2, got {} instead".format(len(x_inter))
+        elif len(x_inter) > 2:
+            warnings.warn("Expected 2 intersection points, got {} instead".format(len(x_inter)))
+            x_curr = np.mean(x_inter)
+            y_curr = y_roc[_locate_closest(x_roc, x_curr)]
+            i += 1
+            continue
         idx = np.argmax(np.abs(x_inter - x_curr))  # Index of the other point
         x_other, y_other = x_inter[idx], y_inter[idx]
 
@@ -204,7 +216,11 @@ def max_ba_operating_point(fpr_roc, tpr_roc, eps=0.05, fpr_init=0.1, max_iter=1_
         x_curr = (x_curr + x_other) / 2
         y_curr = y_roc[_locate_closest(x_roc, x_curr)]
         i += 1
-    return x_curr, y_curr
+    if i == max_iter:
+        conv_bool = False
+    elif err <= eps:
+        conv_bool = True
+    return x_curr, y_curr, conv_bool
 
 
 def _locate_closest(x_arr, target):

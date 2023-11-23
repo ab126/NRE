@@ -347,7 +347,7 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
 # TODO: Both parsers might not be synced
 def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_names_fb=None, conn_params=None,
                               confine_flow_based_entities=True, t_graph=100, sync_window_size=1, time_scale='sec',
-                              standardize=False, best_op_point=True, seed=None):
+                              standardize=False, best_op_point=True, seed=None, **kwargs):
     """
     Compares NRE method with common flow-based classifier among different connection parameters
 
@@ -367,10 +367,12 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
     :param best_op_point: If True, picks the operating point with the highest balanced accuracy and only audits balanced
         accuracy metric
     :param seed: If int, uses this seed for train test split
+    :param kwargs: nre_classification kwargs
     :return all_df: Classification results as a DataFrame object
     """
     if models is None:
-        models = {'Decision Trees': DecisionTreeClassifier(),  # 'Linear Support Vector Machines': LinearSVC(dual='auto')
+        models = {'Decision Trees': DecisionTreeClassifier(),
+                  # 'Linear Support Vector Machines': LinearSVC(dual='auto')
                   'Random Forest': RandomForestClassifier(), 'Naive Bayes': GaussianNB()}
     if conn_params is None:
         conn_params = copy.copy(all_conn_params)
@@ -383,14 +385,14 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
         nre_curves = {}
         df_nre = nre_classification(df, models, conn_param=conn_param, entity_names=entity_names_nre, t_graph=t_graph,
                                     verbose=False, sync_window_size=sync_window_size, roc_curves=nre_curves,
-                                    time_scale=time_scale, standardize=standardize, seed=seed)
+                                    time_scale=time_scale, standardize=standardize, seed=seed, **kwargs)
         if best_op_point:
             df_nre = df_nre.loc[:, ['Balanced Accuracy']]
             for key in nre_curves:
                 fpr, tpr = nre_curves[key]
                 x_roc, y_roc = infer_roc(fpr, tpr)
-                x_op, y_op = max_ba_operating_point(x_roc, y_roc)
-                ba = get_ba_from_operating_point(x_op, y_op)
+                x_op, y_op, conv_bool = max_ba_operating_point(x_roc, y_roc)
+                ba = get_ba_from_operating_point(x_op, y_op) if conv_bool else np.nan
                 df_nre.loc[key, 'Balanced Accuracy'] = ba
 
         conn_param_str = conn_param if conn_param not in conn_param_name_dict else conn_param_name_dict[conn_param]
@@ -410,8 +412,8 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
             for key in flow_based_curves:
                 fpr, tpr = flow_based_curves[key]
                 x_roc, y_roc = infer_roc(fpr, tpr)
-                x_op, y_op = max_ba_operating_point(x_roc, y_roc)
-                ba = get_ba_from_operating_point(x_op, y_op)
+                x_op, y_op, conv_bool = max_ba_operating_point(x_roc, y_roc)
+                ba = get_ba_from_operating_point(x_op, y_op) if conv_bool else np.nan
                 df_flow.loc[key, 'Balanced Accuracy'] = ba
         df_flow['Connection Parameter'] = [conn_param_str for _ in range(df_flow.shape[0])]
         df_flow['Classifier'] = df_flow.index
@@ -446,3 +448,4 @@ def plot_perf_comparison(all_df, title='', perf_metric='Balanced Accuracy', peak
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     return plt.gcf()
+
