@@ -453,7 +453,7 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
 
 
 # TODO: Fix inaccuracies with output variables
-def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.6, return_cov=False, return_datetimes=False,
+def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.2, return_cov=False, return_datetimes=False,
                          timeit=False, **kwargs):
     """
     Returns the entity risks obtained from windowed ConnectivityUnit

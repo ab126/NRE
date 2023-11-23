@@ -20,9 +20,12 @@ from .network_connectivity import MIN_SAMPLES, cic_conn_param_specs
 from .kalman_network_tools import get_risk_mat_from_df
 from .classification_tools import max_ba_operating_point, get_ba_from_operating_point, infer_roc
 
-all_conn_params = ['Num Packets Sent', 'Num Packets Received', 'Packet Length', 'Flow Duration', 'Flow Speed',
+all_conn_params = ['NPS', 'NPR', 'Packet Length', 'Flow Duration', 'Flow Speed',
                    'Response Time', 'Packet Delay', 'Header Length', 'Num Active Packets', 'Active Time', 'Idle Time']
+conn_param_name_dict = {'NPS': 'Number of Packets Sent', 'NPR': 'Number of Packets Received'}  # Name dictionary
 
+
+# all_conn_params = list(cic_conn_param_specs.keys())
 
 def read_cic_flow_meter_csv(file_addr):
     """
@@ -342,13 +345,15 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
 
 
 # TODO: Both parsers might not be synced
-def compare_among_conn_params(df, entity_names_nre, entity_names_fb=None, conn_params=None, confine_flow_based_entities=True, t_graph=100,
-                              sync_window_size=1, time_scale='sec', standardize=False, best_op_point=True, seed=None):
+def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_names_fb=None, conn_params=None,
+                              confine_flow_based_entities=True, t_graph=100, sync_window_size=1, time_scale='sec',
+                              standardize=False, best_op_point=True, seed=None):
     """
     Compares NRE method with common flow-based classifier among different connection parameters
 
     :param df: Canonical source dataframe that has flow information with timestamp, label and flow features. Each row
         is a flow
+    :param models: Machine Learning models to be used as classifiers in comparison
     :param entity_names_nre: List of entities that the flows are constrained to for NRE method
     :param entity_names_fb: List of entities that the flows are constrained to for Flow-based method. If None,
         entity_names_nre is used instead
@@ -364,9 +369,9 @@ def compare_among_conn_params(df, entity_names_nre, entity_names_fb=None, conn_p
     :param seed: If int, uses this seed for train test split
     :return all_df: Classification results as a DataFrame object
     """
-
-    models = {'Linear Support Vector Machines': LinearSVC(dual='auto'), 'Decision Tree': DecisionTreeClassifier(),
-              'Random Forest': RandomForestClassifier(), 'Naive Bayes': GaussianNB()}
+    if models is None:
+        models = {'Decision Trees': DecisionTreeClassifier(),  # 'Linear Support Vector Machines': LinearSVC(dual='auto')
+                  'Random Forest': RandomForestClassifier(), 'Naive Bayes': GaussianNB()}
     if conn_params is None:
         conn_params = copy.copy(all_conn_params)
     if entity_names_fb is None:
@@ -388,7 +393,8 @@ def compare_among_conn_params(df, entity_names_nre, entity_names_fb=None, conn_p
                 ba = get_ba_from_operating_point(x_op, y_op)
                 df_nre.loc[key, 'Balanced Accuracy'] = ba
 
-        df_nre['Connection Parameter'] = [conn_param for _ in range(df_nre.shape[0])]
+        conn_param_str = conn_param if conn_param not in conn_param_name_dict else conn_param_name_dict[conn_param]
+        df_nre['Connection Parameter'] = [conn_param_str for _ in range(df_nre.shape[0])]
         df_nre['Classifier'] = df_nre.index
         df_nre.index = np.arange(df_nre.shape[0])
         df_nre['Method'] = ['Network Risk Estimation' for _ in range(df_nre.shape[0])]
@@ -407,7 +413,7 @@ def compare_among_conn_params(df, entity_names_nre, entity_names_fb=None, conn_p
                 x_op, y_op = max_ba_operating_point(x_roc, y_roc)
                 ba = get_ba_from_operating_point(x_op, y_op)
                 df_flow.loc[key, 'Balanced Accuracy'] = ba
-        df_flow['Connection Parameter'] = [conn_param for _ in range(df_flow.shape[0])]
+        df_flow['Connection Parameter'] = [conn_param_str for _ in range(df_flow.shape[0])]
         df_flow['Classifier'] = df_flow.index
         df_flow.index = np.arange(df_flow.shape[0])
         df_flow['Method'] = ['Flow-Based Network State Inference' for _ in range(df_flow.shape[0])]
