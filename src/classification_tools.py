@@ -90,15 +90,24 @@ def infer_roc(fpr, tpr, n_points=100, deg=1, min_ro_points=5, far_point_mult=1.3
 
     ind_x, ind_y = ~np.isinf(fpr_t), ~np.isinf(tpr_t)
     fpr_op, tpr_op = fpr_t[ind_x], tpr_t[ind_y]  # Non-infinite operating coordinates
-    if len(fpr_op) != 0 or len(tpr_op) != 0:
-        fpr_mean = np.mean(fpr_op) if len(fpr_op) != 0 else 0
-        tpr_mean = np.mean(tpr_op) if len(fpr_op) != 0 else 0
+    if len(fpr_op) != 0 and len(tpr_op) != 0:
+        fpr_mean = np.mean(fpr_op)
+        tpr_mean = np.mean(tpr_op)
         far_point_coord = np.max(np.abs(np.concatenate((fpr_op, tpr_op)))) * far_point_mult
-        far_point_low = (-far_point_coord + fpr_mean, -far_point_coord + tpr_mean)
-        far_point_high = (far_point_coord + fpr_mean, far_point_coord + tpr_mean)
+    elif len(fpr_op) != 0:  # len(tpr_op) == 0
+        fpr_mean = np.mean(fpr_op)
+        tpr_mean = 0
+        far_point_coord = np.max(fpr_op) * far_point_mult
+    elif len(tpr_op) != 0:  # len(fpr_op) == 0
+        tpr_mean = np.mean(tpr_op)
+        fpr_mean = 0
+        far_point_coord = np.max(tpr_op) * far_point_mult
     else:
+        fpr_mean = 0
+        tpr_mean = 0
         far_point_coord = 1
-        far_point_low, far_point_high = (-far_point_coord, -far_point_coord), (far_point_coord, far_point_coord)
+    far_point_low = (-far_point_coord + fpr_mean, -far_point_coord + tpr_mean)
+    far_point_high = (far_point_coord + fpr_mean, far_point_coord + tpr_mean)
 
     # Replace inf coordinates with the "far points coordinates"
     fpr_t[np.isneginf(fpr_t)] = far_point_low[0]  # -far_point_coord
@@ -129,7 +138,7 @@ def infer_roc(fpr, tpr, n_points=100, deg=1, min_ro_points=5, far_point_mult=1.3
     return x, y_predict
 
 
-def plot_roc_curves(roc_curves, title, smooth_roc=True, show=False):
+def plot_roc_curves(roc_curves, title, smooth_roc=True, show=False, font_size=18):
     """
     Plots the Receiver Operating Characteristic curves of the classification models
 
@@ -137,10 +146,11 @@ def plot_roc_curves(roc_curves, title, smooth_roc=True, show=False):
     :param title: Title of the plot
     :param smooth_roc: If True, fits a smooth ROC curve
     :param show: If True, plt.show()
+    :param font_size: Fontsize of labels and ticks
     :return fig: figure element
     """
 
-    plt.rcParams.update({'font.size': 14})
+    plt.rcParams.update({'font.size': font_size})
     fig, ax = plt.subplots()  # Create a figure containing a single axes.
     ax.set_title(title)
 

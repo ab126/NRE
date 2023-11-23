@@ -437,9 +437,9 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     k_steps = len(mat_x_list)
     assert k_steps > 0
 
-    fig = plt.figure(figsize=(22, 6))
-    spec = fig.add_gridspec(3, k_steps + 3, height_ratios=[.4, 2, 2.4],
-                            width_ratios=[1.5, .75] + [1 for _ in range(k_steps)] + [.5], hspace=0, wspace=.4)
+    fig = plt.figure(figsize=(16, 6))
+    spec = fig.add_gridspec(3, k_steps + 3, height_ratios=[.4, 1.8, 2.4],
+                            width_ratios=[1.5, .75] + [1 for _ in range(k_steps)] + [.5], hspace=0.2, wspace=0.4)
 
     x_min = np.min(np.array(mat_x_list))
     x_max = np.max(np.array(mat_x_list))
@@ -469,8 +469,8 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     ax_t.plot(1, 0, ls="", marker=">", ms=10, color="k", clip_on=False)
     ax_t.plot([0, 1], [0, 0], 'k')
     # Ticks
-    xts = [.1, .29, .48, .67, .86]
-    shift = 0.08 # How much to shift the start of the time line
+    xts = [.14, .365, .595, .82]#, .86]
+    shift = 0.08  # How much to shift the start of the time line
     for k, xt in enumerate(xts):
         ax_t.plot([xt, xt], [-1, 1], 'k')
         ax_t.text(xt, -2, str(k * t_graph), clip_on=False, fontsize=18, ha="center", va="top")
@@ -491,15 +491,12 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     ax_x_0.set_xlim([0, 0.7])
 
     for k, x_kf, p_kf in zip(np.arange(k_steps) + 1, mat_x_list, mat_p_list):
-        ax_x_k = fig.add_subplot(spec[1, k+1])
+        ax_x_k = fig.add_subplot(spec[1, k + 1])
         x_axs.append(ax_x_k)
-        if k != 1 and show_border:
-            ax_x_k.matshow(x_kf, vmin=x_min, vmax=x_max, cmap=cmap_x)
-        else:
-            ax_x_k.matshow(x_kf, vmin=x_min, vmax=x_max, cmap=cmap_x)
+        ax_x_k.matshow(x_kf, vmin=x_min, vmax=x_max, cmap=cmap_x)
 
         if k == k_steps:
-            ax_x_k.set_ylabel('Entity Index', fontsize=16, labelpad=20, rotation=-90)
+            ax_x_k.set_ylabel('Entity Index', fontsize=18, labelpad=20, rotation=-90)
 
         ax_x_k.tick_params(axis='x', bottom=False, top=False, labeltop=False)
         ax_x_k.set_yticks(np.arange(n_nodes, step=4))
@@ -509,10 +506,11 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
 
     ax_x_last = fig.add_subplot(spec[1, -1])
     ax_x_last.axis('off')
-    cbar_x = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_x, cmap=cmap_x), ax=ax_x_last, location='left',
-                          shrink=1.2)  # , pad=-20)
+    cbar_x = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_x, cmap=cmap_x), ax=ax_x_last,# location='left',
+                          shrink=1, pad=-1.5)
     cbar_x.set_label('Mean of Risk\nEstimates ' + r'($\hat{\mathbf{x}}_{t|t}$)', fontsize=20, rotation=-90,
-                     labelpad=-40)
+                     labelpad=55) #-40
+    cbar_x.ax.yaxis.set_ticks_position('left')
     cbar_x.ax.tick_params(labelsize=18)
     cbar_x.ax.yaxis.offsetText.set(size=18)
 
@@ -524,12 +522,8 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     ax_p_0.set_xlim([0, 0.7])
 
     for k, x_kf, p_kf in zip(np.arange(k_steps) + 1, mat_x_list, mat_p_list):
-        ax_p_k = fig.add_subplot(spec[2, k+1])
-
-        if k != 1 and show_border:
-            ax_p_k.matshow(p_kf, vmin=p_min, vmax=p_max, cmap=cmap_p)
-        else:
-            ax_p_k.matshow(p_kf, vmin=p_min, vmax=p_max, cmap=cmap_p)
+        ax_p_k = fig.add_subplot(spec[2, k + 1])
+        ax_p_k.matshow(p_kf, vmin=p_min, vmax=p_max, cmap=cmap_p)
 
         if k == k_steps:
             ax_p_k.set_ylabel('Entity Index', fontsize=18, labelpad=20, rotation=-90)
@@ -551,8 +545,7 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     cbar_p.ax.tick_params(labelsize=18)
     cbar_p.ax.yaxis.offsetText.set(size=18)
 
-    spec.tight_layout(fig)
-    #plt.suptitle(title, fontsize=30)
+    # plt.suptitle(title, fontsize=30)
     if save_name is not None:
         plt.savefig(save_name)  # , transparent=True)
     plt.show()
