@@ -1,5 +1,6 @@
 import datetime
 import matplotlib
+import json
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -469,7 +470,7 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
     ax_t.plot(1, 0, ls="", marker=">", ms=10, color="k", clip_on=False)
     ax_t.plot([0, 1], [0, 0], 'k')
     # Ticks
-    xts = [.14, .365, .595, .82]#, .86]
+    xts = [.14, .365, .595, .82]  # , .86]
     shift = 0.08  # How much to shift the start of the time line
     for k, xt in enumerate(xts):
         ax_t.plot([xt, xt], [-1, 1], 'k')
@@ -506,10 +507,10 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
 
     ax_x_last = fig.add_subplot(spec[1, -1])
     ax_x_last.axis('off')
-    cbar_x = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_x, cmap=cmap_x), ax=ax_x_last,# location='left',
+    cbar_x = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_x, cmap=cmap_x), ax=ax_x_last,  # location='left',
                           shrink=1, pad=-1.5)
     cbar_x.set_label('Mean of Risk\nEstimates ' + r'($\hat{\mathbf{x}}_{t|t}$)', fontsize=20, rotation=-90,
-                     labelpad=55) #-40
+                     labelpad=55)  # -40
     cbar_x.ax.yaxis.set_ticks_position('left')
     cbar_x.ax.tick_params(labelsize=18)
     cbar_x.ax.yaxis.offsetText.set(size=18)
@@ -562,7 +563,8 @@ def polar2cartesian(r, theta, units='deg'):
     return r * np.cos(theta), r * np.sin(theta)
 
 
-def cartesian_dist_plot(g, distances, risks, title='', dx=1, dy=1, n_points=1000, plot=True, show_names=True):
+def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, dy=1, n_points=1000, plot=True,
+                        show_names=True, label_size=8, paths_highlight=None):
     """
     Depicts the network according to the calculated distances to route from source to every other entity. Fits the
     entities to integer cartesian coordinates where the source is left most and every other entity is distributed according
@@ -572,12 +574,15 @@ def cartesian_dist_plot(g, distances, risks, title='', dx=1, dy=1, n_points=1000
     :param distances: Dictionary of distances or risk-levels from the source. The Dictionary is ordered with increasing
         distances
     :param risks: Dictionary of entity risks
+    :param destination: (optional) Destination node name
     :param title: Title of the plot
     :param dx: Increment in x direction
     :param dy: Increment in y direction
     :param plot: If True, show the plot
     :param n_points: Number of points to draw vertical lines
-    :param show_names: If True, shows the names of entities as well
+    :param show_names: If True, shows the names of entities as well.
+    :param label_size: Fontsize for labels.
+    :param paths_highlight: List of paths, that are list of node tuples, to highlight.
     :return fig: Figure of the network plot
     """
     source = list(distances.keys())[0]
@@ -596,7 +601,12 @@ def cartesian_dist_plot(g, distances, risks, title='', dx=1, dy=1, n_points=1000
 
         # Update coordinates
         if idx != idx_prev:
-            y_init = - (num - 1) / 2 * dy
+            if num != 1:
+                y_init = - (num - 1) / 2 * dy
+            elif i == 0 or i == len(distances) - 1:
+                y_init = 0
+            else:
+                y_init = (-1) ** (i + 1) * dy / 2
             x_cur, y_cur = x_cur + dx, y_init
             x_curs.append(x_cur)
         else:
@@ -610,18 +620,27 @@ def cartesian_dist_plot(g, distances, risks, title='', dx=1, dy=1, n_points=1000
         xs = np.array([x_cur for _ in ys])
         ax.plot(xs, ys, 'tab:gray', alpha=.2)
 
+    # Plot x axis
+    y_x_ax = -(max_num / 2 + 1)
+    ax.plot([x_curs[0], x_curs[-1]], [y_x_ax, y_x_ax], color="k")
+    ax.plot(x_curs[-1], y_x_ax, ls="", marker=">", ms=5, color="k", clip_on=False)
+
     # Plot the rest
-    cmap = plt.cm.Reds  # plt.cm.Reds
+    cmap = plt.cm.YlOrRd  # plt.cm.Reds
     node_clr = [risks[node] for node in g.nodes]
     norm = matplotlib.colors.Normalize(vmin=min(node_clr), vmax=max(node_clr))
 
+    # Draw most nodes
+    most_nodes = [node for node in g.nodes if node != source and node != destination]
+    most_clr = [risks[node] for node in most_nodes]
     if show_names:
-        pos_label = {node: pos[node] + (0, 0.45) for node in pos}
-        nx.draw_networkx_labels(g, pos_label, ax=ax, clip_on=False, font_size=10)
-    most_nodes = nx.draw_networkx_nodes(g, pos, cmap=cmap, node_color=node_clr, ax=ax)
+        pos_label = {node: pos[node] + (-.02, -0.5) for node in pos}
+        labels = {node: '' + '.'.join(node.split('.')[-4:]) for node in pos}
+        nx.draw_networkx_labels(g, pos_label, labels=labels, ax=ax, clip_on=False, font_size=label_size)
+    most_nodes = nx.draw_networkx_nodes(g, pos, nodelist=most_nodes, cmap=cmap, node_color=most_clr, ax=ax)
     most_nodes.set_edgecolor('black')
     most_nodes.set_linewidth(2)
-    nx.draw_networkx_edges(g, pos, width=1.6, edge_color='darkred', ax=ax)
+    nx.draw_networkx_edges(g, pos, width=1.2, edge_color='black', ax=ax)
 
     # Draw the source
     options = {"node_size": 350, "node_shape": 's', "node_color": cmap(norm(risks[source]))}
@@ -629,10 +648,25 @@ def cartesian_dist_plot(g, distances, risks, title='', dx=1, dy=1, n_points=1000
     src_node.set_edgecolor('black')
     src_node.set_linewidth(2)
 
-    if not show_names:
-        ax.annotate('Source', xy=pos[source] + (-.28, .45), size=9, annotation_clip=False)
+    # Draw Destination
+    if destination is not None:
+        options = {"node_size": 350, "node_shape": 'D', "node_color": cmap(norm(risks[destination]))}
+        dst_node = nx.draw_networkx_nodes(g, pos, nodelist=[destination], ax=ax, **options)
+        dst_node.set_edgecolor('black')
+        dst_node.set_linewidth(2)
+        if paths_highlight is not None:
+            clrs = np.tile(['tab:green', 'tab:red'], len(paths_highlight) // 2 + 1)
+            for i, path in enumerate(paths_highlight):
+                nx.draw_networkx_edges(g, pos, edgelist=path, width=3, edge_color=clrs[i], ax=ax,
+                                       arrows=True, arrowstyle='-|>')
+
+    ax.annotate('Source', xy=pos[source], xytext=(-1.6, 1.2), size=12, annotation_clip=False,
+                textcoords='offset fontsize')
+    ax.annotate('Destination', xy=pos[destination], xytext=(-2.8, 1.3), size=12, annotation_clip=False,
+                textcoords='offset fontsize')
+
     cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, pad=0.05, shrink=0.6)
-    cbar.set_label('Entity Risks', labelpad=-55)
+    cbar.set_label('Mean Entity Risks', labelpad=-55)
     ax.set_title(title)
     plt.box(False)
 
@@ -721,3 +755,17 @@ def polar_dist_plot(g, distances, risks, title='', plot=True, n_points=1000, see
     if plot:
         plt.show()
     return fig
+
+
+def pos2json(filename, **kwargs):
+    """
+    Writes the {entity: np.array(., .)} dictionaries to the filename.json file
+
+    :param filename: .json file name
+    :param kwargs: {keys:vals} keys are added to the json object as field whose values are vals
+    """
+    json_dict = {}
+    for key, val in kwargs.items():
+        json_dict[key] = val
+    with open(filename + '.json', "w") as outfile:
+        json.dump(json_dict, outfile)
