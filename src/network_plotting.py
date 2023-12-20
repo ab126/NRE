@@ -1,3 +1,4 @@
+import copy
 import datetime
 import matplotlib
 import json
@@ -757,6 +758,26 @@ def polar_dist_plot(g, distances, risks, title='', plot=True, n_points=1000, see
     return fig
 
 
+def normalize_coordinates(pos, risk_mean, risk_cov, diam_xy=2, diam_z=2):
+    """Normalizes the coordinates of the nodes in each axis according the diameter diam_xy"""
+    # Read the diam
+    max_x, max_y, min_x, min_y = -np.inf, -np.inf, np.inf, np.inf
+    max_risk = 0
+    for node in pos:
+        x, y = pos[node]
+        max_x, max_y, min_x, min_y = max(x, max_x), max(y, max_y), min(x, max_x), min(y, max_y)
+    for val in risk_mean:
+        max_risk = max(val, max_risk)
+
+    # Adjust diam
+    mult_x, mult_y = diam_xy / (max_x - min_x), diam_xy / (max_y - min_y)
+    mult_z = diam_z / max_risk
+    for node in pos:
+        pos[node] = np.multiply(pos[node], np.array(mult_x, mult_y))
+    risk_mean = risk_mean * mult_z
+    risk_cov = risk_cov * (mult_z ** 2)
+    return pos, risk_mean, risk_cov
+
 def pos2json(filename, **kwargs):
     """
     Writes the {entity: np.array(., .)} dictionaries to the filename.json file
@@ -769,3 +790,4 @@ def pos2json(filename, **kwargs):
         json_dict[key] = val
     with open(filename + '.json', "w") as outfile:
         json.dump(json_dict, outfile)
+
