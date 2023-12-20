@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import * as data from './net_data1.json' assert {type: 'json'}; 
+import * as data from './saves/net_data2.json' assert {type: 'json'}; 
 
 let camera, scene, renderer, controls;
 const radius = 0.05
@@ -11,7 +11,7 @@ animate();
 function init(){    
 
     // Read planar positions
-    const {pos, edges, risk_mean, risk_cov} = data
+    const {pos, topologyEdges, risk_mean, risk_cov, funcEdges} = data
     console.log(pos)
     
     // Scene & Camera
@@ -63,7 +63,7 @@ function init(){
         color: 0xffffff
     });
 
-    const edgePoints = makeEdgePoints(edges)
+    const edgePoints = makeEdgePoints(topologyEdges)
     const edgeGeometry = new THREE.BufferGeometry().setFromPoints( edgePoints );
     const lines = new THREE.Line( edgeGeometry, lineMaterial );
     scene.add( lines );
