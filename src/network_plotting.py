@@ -778,6 +778,7 @@ def normalize_coordinates(pos, risk_mean, risk_cov, diam_xy=2, diam_z=2):
     risk_cov = risk_cov * (mult_z ** 2)
     return pos, risk_mean, risk_cov
 
+
 def pos2json(filename, **kwargs):
     """
     Writes the {entity: np.array(., .)} dictionaries to the filename.json file

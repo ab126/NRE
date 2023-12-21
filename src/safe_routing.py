@@ -16,7 +16,7 @@ from src.network_connectivity import get_all_entities
 
 
 def communication_graph_from_df(df, entity_names=None, keep_outsiders=True, src_id_col=' Source IP',
-                                dst_id_col=' Destination IP'):
+                                dst_id_col=' Destination IP', spanning_tree=False):
     """
     Given canonical DataFrame df, returns the observed communication graph that holds the entities and available
     communication channels between them.
@@ -29,6 +29,7 @@ def communication_graph_from_df(df, entity_names=None, keep_outsiders=True, src_
         belong to entity_names
     :param src_id_col: Column name of the flows data DatatFrame that identifies the source entity.
     :param dst_id_col: Column name of the flows data DatatFrame that identifies the destination entity.
+    :param spanning_tree: If True returns only the spanning tree
     :return: NetworkX graph g: Communication graph of the network
     """
     if entity_names:
@@ -43,6 +44,8 @@ def communication_graph_from_df(df, entity_names=None, keep_outsiders=True, src_
         src = row[src_id_col]
         dst = row[dst_id_col]
         g.add_edge(src, dst)
+    if spanning_tree:
+        g = nx.minimum_spanning_tree(g)
     return g
 
 
