@@ -7,12 +7,13 @@ import * as data from './saves/net_data2.json' assert {type: 'json'};
 
 let camera, scene, renderer, controls;
 let entityGroup;
-let nodeGeometry, nodePositions, nodeCloud;
+let nodeGeometry, nodePositions, nodePointCloud;
 let edgeGeometry, edgePositions, edgeCloud;
 const radius = 0.05;
 const dz = 0.01
 
 const effectController = {
+    solidEntities: true,
     showLines: false,
     showRisks: false
 };
@@ -27,6 +28,13 @@ animate();
 
 function initGUI(){
     const gui = new GUI();
+
+    gui.add( effectController, 'solidEntities' ).onChange( function ( value ) {
+
+        entityGroup.visible = value;
+        nodePointCloud.visible = !value
+
+    } );
 
     gui.add( effectController, 'showLines' ).onChange( function ( value ) {
 
@@ -53,11 +61,14 @@ function initGUI(){
 
             edgePositions[ 6 * i + 5] = elavate ? risk_mean[dst] : 0;
         }
-        /*
-        Object.keys(pos).forEach((name, index) => {
-            dodec = nodes[index]
-            changeElavation(name, dodec, value)
-        });*/
+
+        // TODO: Need not update node positions additionally
+        for ( let i = 0; i < nNodes; i ++ ) {
+
+            let dodec = entityGroup.children[i]
+            dodec.position.set(nodePositions[ 3 * i ], nodePositions[ 3 * i + 1 ], nodePositions[ 3 * i + 2])
+            
+        }
 
     } );
 }
@@ -104,18 +115,18 @@ function init(){
 
     // Geometries & Material
     
+    // Nodes
+
     entityGroup = new THREE.Group(); // Entity nodes and edges
     scene.add( entityGroup );
-
-    // Nodes
     
     nodeGeometry = new THREE.BufferGeometry();
     nodePositions = new Float32Array( nNodes * 3 );
 
-    //const nodeMaterial = new THREE.MeshStandardMaterial( {color: 0x242323} );
-    const nodeMaterial = new THREE.PointsMaterial( {
+    const nodeMaterial = new THREE.MeshStandardMaterial( {color: 0x242323} );
+    const nodePointMaterial = new THREE.PointsMaterial( {
         color: 0xFFFFFF,
-        size: 6,
+        size: 2,
         blending: THREE.AdditiveBlending,
         transparent: true,
         sizeAttenuation: false
@@ -132,13 +143,28 @@ function init(){
     
     nodeGeometry.setAttribute( 'position', new THREE.BufferAttribute( nodePositions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
         
-    nodeCloud = new THREE.Points( nodeGeometry, nodeMaterial );
-    entityGroup.add(nodeCloud)
+    nodePointCloud = new THREE.Points( nodeGeometry, nodePointMaterial );
+    nodePointCloud.visible = false
+    scene.add(nodePointCloud)
+    
+    for ( let i = 0; i < nNodes; i ++ ) {
+        const geometryDodec = new THREE.DodecahedronGeometry( radius );
+        const dodec = new THREE.Mesh( geometryDodec, nodeMaterial );
+
+        /*dodec.position.x = nodePositions[ 3 * i ]
+        dodec.position.y = nodePositions[ 3 * i  + 1]
+        dodec.position.z = nodePositions[ 3 * i + 2]*/
+        dodec.position.set(nodePositions[ 3 * i ], nodePositions[ 3 * i + 1 ], nodePositions[ 3 * i + 2])
+        
+        entityGroup.add( dodec );
+    }
+
+    console.log(entityGroup)
+    console.log(nodePointCloud)
     
     /*
-    const nodes = [];
     Object.keys(pos).forEach(element => {
-        nodes.push(makeNode(element, nodeMaterial, radius))
+        entityGroup.add(makeNode(element, nodeMaterial, radius))
     });*/
 
     // Edges
@@ -155,44 +181,9 @@ function init(){
     
     edgeCloud = new THREE.LineSegments( edgeGeometry, edgeMaterial );
     edgeCloud.visible = false
-    entityGroup.add( edgeCloud );
+    scene.add( edgeCloud );
 
-    const controls = new OrbitControls( camera, renderer.domElement );
-
-    /**
-     * Makes and adds entity as nodes to the scene
-     * @param {*} name 
-     * @param {*} material
-     * @param {*} radius Node raidus
-     */
-    function makeNode(name, material, radius = 0.05) {
-
-        const geometry_dodec = new THREE.DodecahedronGeometry( radius );
-        const dodec = new THREE.Mesh( geometry_dodec, material );
-        dodec.position.x = pos[name][0]
-        dodec.position.y = pos[name][1]
-        dodec.position.z = 0 //risk_mean[name]
-        
-        scene.add( dodec );
-
-        return dodec
-    }
-
-    /**
-     * Elavataes the nodes according to risk levels
-     * @param {*} name 
-     * @param {*} dodec 
-     * @param {*} elavate If true elavate according to risks 
-     * @returns 
-     */
-    function changeElavation(name, dodec, elavate) {
-
-        dodec.position.z = elavate ? risk_mean[name] : 0
-        
-        scene.add( dodec );
-    }
-
-    
+    const controls = new OrbitControls( camera, renderer.domElement );   
     
 }
 
@@ -221,14 +212,14 @@ function makeEdgePositions(edges, elavate){
 
 function animate() {
     
-    nodeCloud.geometry.attributes.position.needsUpdate = true;
+    nodePointCloud.geometry.attributes.position.needsUpdate = true;
     edgeCloud.geometry.attributes.position.needsUpdate = true;
+    /*
+    entityGroup.children.forEach(element => {
+        element.geometry.attributes.position.needsUpdate = true;
+    });*/
 
     const time = Date.now() * 0.001;
-    
-    //cube.rotation.y = time * 0.4;
-	
-	//controls.update();
 
 	renderer.render( scene, camera );
 
