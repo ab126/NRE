@@ -29,6 +29,7 @@ const nEdges = Object.keys(topologyEdges).length;
 
 init();
 animate();
+console.log(funcEdges)
 
 function initGUI(){
     const gui = new GUI();
