@@ -7,5 +7,4 @@
 /src/network_rendering/saves/
 /src/network_rendering/vite.config.mjs
 /src/network_rendering/misc/
-/src/network_rendering/node_modules/
 /src/network_rendering/python/py2js.py
