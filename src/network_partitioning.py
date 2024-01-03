@@ -33,7 +33,21 @@ def get_eig_vals_err(mat_f, node_names, plot_bool=True):
 
 
 def apply_spec_clus(mat_f, node_names, n_clus, plot_bool=True, fontsize=24, seed=5):
-    """Applies spectral clustering to nx graph g returns the assigned clusters"""
+    """
+    Applies spectral clustering to nx graph g returns the assigned clusters
+
+    :param mat_f: Numpy 2d array representing the adjacency matrix
+    :param node_names: List of names according to mat_f
+    :param n_clus: Number of clusters
+    :param plot_bool: If True, displays the clusters overlayed on top of mat_f
+    :param fontsize: Fontsize used in plotting
+    :param seed: Seed used for spectral clustering
+    :return gr, all_labels, all_clusters:
+        gr: Original graph reordered according to clusters
+        all_labels: Cluster labels of all nodes
+        all_clusters: Indices of all clusters
+    """
+
     g = nx.from_numpy_array(mat_f, create_using=nx.DiGraph)
     g = g.to_undirected()  # should make it undirected first
     g = nx.relabel_nodes(g, {node_names.index(node): node for node in node_names})

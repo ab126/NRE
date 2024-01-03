@@ -556,7 +556,7 @@ def risks_over_time_2d(mat_x_list, mat_p_list, mat_f, t_graph=20, title='', save
 
 # Safe Routing Plotting Functions
 def polar2cartesian(r, theta, units='deg'):
-    """Return the cartesian coordinates corresponding to the polar coordinates"""
+    """Return the cartesian coordinates (x, y) corresponding to the polar coordinates"""
     if units == 'deg':
         theta = theta * np.pi / 180
     else:
@@ -758,25 +758,43 @@ def polar_dist_plot(g, distances, risks, title='', plot=True, n_points=1000, see
     return fig
 
 
-def normalize_coordinates(pos, risk_mean, risk_cov, diam_xy=2, diam_z=2):
-    """Normalizes the coordinates of the nodes in each axis according the diameter diam_xy"""
+def normalize_coordinates(pos, risk_mean=None, risk_cov=None, diam_xy=2, diam_z=2):
+    """
+    Normalizes the coordinates of the nodes in each axis according the diameter diam_xy
+
+    :param pos: X-y coordinates of entities
+    :param risk_mean: Mean of estimated risks are mapped to z coordinate in layout
+    :param risk_cov: Covariance is scaled according to risk_mean
+    :param diam_xy: Difference in max and min coordinates along x & y-axis (assumed same)
+    :param diam_z: Difference in max and min coordinates along z axis
+    :return pos, risk_mean, risk_cov: Returns the normalized input
+    """
+
     # Read the diam
     max_x, max_y, min_x, min_y = -np.inf, -np.inf, np.inf, np.inf
     max_risk = 0
+
+    # Get max coordinates
     for node in pos:
         x, y = pos[node]
-        max_x, max_y, min_x, min_y = max(x, max_x), max(y, max_y), min(x, max_x), min(y, max_y)
-    for val in risk_mean:
-        max_risk = max(val, max_risk)
+        max_x, max_y, min_x, min_y = max(x, max_x), max(y, max_y), min(x, min_x), min(y, min_y)
+
+    if risk_mean is not None:
+        for val in risk_mean:
+            max_risk = max(val, max_risk)
 
     # Adjust diam
     mult_x, mult_y = diam_xy / (max_x - min_x), diam_xy / (max_y - min_y)
-    mult_z = diam_z / max_risk
+    mult_z = diam_z / max_risk if risk_mean is not None else 1
+    base_xy = np.array([min_x, min_y])
     for node in pos:
-        pos[node] = np.multiply(pos[node], np.array(mult_x, mult_y))
-    risk_mean = risk_mean * mult_z
-    risk_cov = risk_cov * (mult_z ** 2)
-    return pos, risk_mean, risk_cov
+        pos[node] = np.multiply(pos[node] - base_xy, np.array(mult_x, mult_y)) - diam_xy/2
+    risk_mean = risk_mean * mult_z if risk_mean is not None else None
+    risk_cov = risk_cov * (mult_z ** 2) if risk_mean is not None else None
+    if risk_mean is not None:
+        return pos, risk_mean, risk_cov
+    else:
+        return pos
 
 
 def pos2json(filename, **kwargs):

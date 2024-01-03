@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import vertexShader from './shaders/vertex.glsl'
-import fragmentShader from './shaders/fragment.glsl'
+//import vertexShader from './shaders/vertex.glsl'
+//import fragmentShader from './shaders/fragment.glsl'
 
 import * as data from './saves/net_data1.json' assert {type: 'json'}; 
 
@@ -217,18 +217,18 @@ function init(){
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( allEdgePositions, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
 
-    /*
+    
     const edgeConnectivityMaterial = new THREE.LineBasicMaterial({
         //color: 0xbf0000,
         vertexColors: true,
         //transparent: true
-    });*/
-    
+    });
+    /*
     const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
         vertexShader: vertexShader,
         fragmentShader: fragmentShader,
         transparent: true,
-    } );
+    } );*/
 
     edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     scene.add( edgeConnectivity );
