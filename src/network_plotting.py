@@ -11,6 +11,7 @@ import seaborn as sns
 from matplotlib.lines import Line2D
 
 from src.network_connectivity import ConnectivityUnit
+from src.network_partitioning import apply_spec_clus
 from src.time_windowed import get_window
 
 
@@ -758,7 +759,7 @@ def polar_dist_plot(g, distances, risks, title='', plot=True, n_points=1000, see
     return fig
 
 
-def normalize_coordinates(pos, risk_mean=None, risk_cov=None, diam_xy=2, diam_z=2):
+def normalize_coordinates(pos, risk_mean=None, risk_cov=None, diam_xy=4, diam_z=2):
     """
     Normalizes the coordinates of the nodes in each axis according the diameter diam_xy
 
@@ -788,7 +789,7 @@ def normalize_coordinates(pos, risk_mean=None, risk_cov=None, diam_xy=2, diam_z=
     mult_z = diam_z / max_risk if risk_mean is not None else 1
     base_xy = np.array([min_x, min_y])
     for node in pos:
-        pos[node] = np.multiply(pos[node] - base_xy, np.array(mult_x, mult_y)) - diam_xy/2
+        pos[node] = np.multiply(pos[node] - base_xy, np.array([mult_x, mult_y])) - diam_xy / 2
     risk_mean = risk_mean * mult_z if risk_mean is not None else None
     risk_cov = risk_cov * (mult_z ** 2) if risk_mean is not None else None
     if risk_mean is not None:
@@ -810,3 +811,37 @@ def pos2json(filename, **kwargs):
     with open(filename + '.json', "w") as outfile:
         json.dump(json_dict, outfile)
 
+
+def pie_layout(mat_f, entity_names, n_cluster, d=1.5, r_const=4, plot_bool=True):
+    """Computes the "Pie Layout" for the network given by mat_f"""
+
+    gr, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
+
+    phi = 2 * np.pi / (n_cluster - 1)  # Constant angle of pie given for each cluster
+    r = r_const * d / phi
+    scale_cluster = 0.8
+    cmap = plt.get_cmap('cool')
+
+    pos_pie = {}
+    node_colors = []
+    for i in clusters:
+        if i == 0:
+            continue
+        ind = new_labels == i
+        gs = gr.subgraph(np.array(gr.nodes)[ind])
+        theta_i = phi * (i - 1)
+
+        pos = nx.spring_layout(gs, seed=43)
+        pos = normalize_coordinates(pos, diam_xy=d)
+
+        for node in gs.nodes:
+            x, y = pos[node] * scale_cluster
+            pos_pie[node] = np.array(polar2cartesian(r + y, np.pi / 2 - (x / d * phi + theta_i), units='rad'))
+            node_colors.append(cmap(i / n_cluster))
+
+    gt = gr.subgraph(list(pos_pie.keys()))
+    if plot_bool:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        widths = [gt[u][v]['weight'] for u, v in gt.edges]
+        nx.draw(gt, pos_pie, with_labels=True, width=widths, ax=ax, node_color=node_colors)
+    return pos_pie, node_colors, r, gt

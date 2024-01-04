@@ -3,14 +3,16 @@ import * as THREE from 'three';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-//import vertexShader from './shaders/vertex.glsl'
-//import fragmentShader from './shaders/fragment.glsl'
+import vertexShader from './shaders/vertex.glsl.js'
+import fragmentShader from './shaders/fragment.glsl.js'
 
-import * as data from './saves/net_data1.json' assert {type: 'json'}; 
+import * as data from './saves/net_data_63.json' assert {type: 'json'}; 
+
+console.log(data)
 
 let camera, scene, renderer, controls;
 let entityGroup;
-let nodeGeometry, nodePositions, nodePointCloud;
+let nodePointGeometry, nodeColors, nodePositions, nodePointCloud;
 let edgeGeometry, edgePositions, edgeTopology;
 let edgeConnectivity, edgeColors, allEdgePositions;
 const radius = 0.05;
@@ -23,13 +25,12 @@ const effectController = {
 };
 
 // Read planar positions
-const {pos, topologyEdges, risk_mean, risk_cov, funcEdges} = data
+const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
 const nNodes = Object.keys(pos).length;
 const nEdges = Object.keys(topologyEdges).length;
 
 init();
 animate();
-console.log(funcEdges)
 
 function initGUI(){
     const gui = new GUI();
@@ -131,7 +132,6 @@ function init(){
     //plane.position.z = -dz
     //plane.receiveShadow = true;
     scene.add( plane );
-    console.log(plane)
 
     // Grid Lines
     const helper = new THREE.GridHelper( 5, 20 );
@@ -139,7 +139,38 @@ function init(){
     helper.rotateX(Math.PI / 2)
     helper.material.opacity = 0.85;
     helper.material.transparent = false;
-    scene.add( helper );
+    //scene.add( helper );
+
+    // Pie Outline
+    const pieOutline = new THREE.Group();
+    scene.add(pieOutline)
+
+    const outlineMaterial = new THREE.LineBasicMaterial( { color: 0xffffff } );
+
+    const outerCircle = new THREE.EllipseCurve(
+        0,  0,            // ax, aY
+        extras.radius + extras.diam/2, extras.radius + extras.diam/2,  // xRadius, yRadius
+        0,  2 * Math.PI,  // aStartAngle, aEndAngle
+        false,            // aClockwise
+        0                 // aRotation
+    );
+    let points = outerCircle.getPoints( 1000 );
+    let pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
+    const outerLine = new THREE.Line( pieGeometry, outlineMaterial );
+    pieOutline.add(outerLine)
+
+    const innerCircle = new THREE.EllipseCurve(
+        0,  0,            // ax, aY
+        extras.radius - extras.diam/2, extras.radius - extras.diam/2,  // xRadius, yRadius
+        0,  2 * Math.PI,  // aStartAngle, aEndAngle
+        false,            // aClockwise
+        0                 // aRotation
+    );
+    points = innerCircle.getPoints( 1000 );
+    pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
+    const innerLine = new THREE.Line( pieGeometry, outlineMaterial );
+    pieOutline.add(innerLine)
+    console.log(pieOutline)
 
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -154,10 +185,16 @@ function init(){
     entityGroup = new THREE.Group(); // Entity nodes and edges
     scene.add( entityGroup );
     
-    nodeGeometry = new THREE.BufferGeometry();
+    nodePointGeometry = new THREE.BufferGeometry();
     nodePositions = new Float32Array( nNodes * 3 );
+    nodeColors = new Float32Array( nNodes * 4 );
 
-    const nodeMaterial = new THREE.MeshStandardMaterial( {color: 0x0a0859} );
+    
+    /*const nodeMaterial =new THREE.ShaderMaterial( {
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        transparent: true,
+    } );*/
     const nodePointMaterial = new THREE.PointsMaterial( {
         color: 0x242323,
         size: 4,
@@ -173,26 +210,31 @@ function init(){
         nodePositions[ i * 3 + 1 ] = pos[name][1];
         nodePositions[ i * 3 + 2 ] = 0;
 
+        nodeColors[ i * 4 ] = entityColors[name][0];
+        nodeColors[ i * 4 + 1] = entityColors[name][1];
+        nodeColors[ i * 4 + 2] = entityColors[name][2];
+        nodeColors[ i * 4 + 3] = entityColors[name][3];
+
     }
     
-    nodeGeometry.setAttribute( 'position', new THREE.BufferAttribute( nodePositions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
-        
-    nodePointCloud = new THREE.Points( nodeGeometry, nodePointMaterial );
+    nodePointGeometry.setAttribute( 'position', new THREE.BufferAttribute( nodePositions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
+    nodePointGeometry.setAttribute( 'color', new THREE.BufferAttribute( nodeColors, 3 ).setUsage( THREE.DynamicDrawUsage ) );
+
+    nodePointCloud = new THREE.Points( nodePointGeometry, nodePointMaterial );
     nodePointCloud.visible = false
     scene.add(nodePointCloud)
     
     for ( let i = 0; i < nNodes; i ++ ) {
         const geometryDodec = new THREE.DodecahedronGeometry( radius );
+        const nodeMaterial = new THREE.MeshStandardMaterial( {color: 0x0a0859} );
+
         const dodec = new THREE.Mesh( geometryDodec, nodeMaterial );
 
-        /*dodec.position.x = nodePositions[ 3 * i ]
-        dodec.position.y = nodePositions[ 3 * i  + 1]
-        dodec.position.z = nodePositions[ 3 * i + 2]*/
-        dodec.position.set(nodePositions[ 3 * i ], nodePositions[ 3 * i + 1 ], nodePositions[ 3 * i + 2])
-        
+        dodec.position.set(nodePositions[ 3 * i ], nodePositions[ 3 * i + 1 ], nodePositions[ 3 * i + 2]);
+        dodec.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entityGroup.add( dodec );
     }
-
+    console.log(entityGroup)
     // Edges
 
     makeEdgePositions(topologyEdges, false);
@@ -216,19 +258,19 @@ function init(){
     const edgeConnectivityGeometry = new THREE.BufferGeometry()
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( allEdgePositions, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
-
-    
+    console.log(edgeConnectivityGeometry)
+    /*
     const edgeConnectivityMaterial = new THREE.LineBasicMaterial({
         //color: 0xbf0000,
         vertexColors: true,
         //transparent: true
-    });
-    /*
+    });*/
+    
     const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
         vertexShader: vertexShader,
         fragmentShader: fragmentShader,
         transparent: true,
-    } );*/
+    } );
 
     edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     scene.add( edgeConnectivity );
