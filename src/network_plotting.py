@@ -759,7 +759,7 @@ def polar_dist_plot(g, distances, risks, title='', plot=True, n_points=1000, see
     return fig
 
 
-def normalize_coordinates(pos, risk_mean=None, risk_cov=None, diam_xy=4, diam_z=2):
+def normalize_coordinates(pos, risk_mean=None, risk_cov=None, diam_xy=4.0, diam_z=2.0):
     """
     Normalizes the coordinates of the nodes in each axis according the diameter diam_xy
 
@@ -812,13 +812,13 @@ def pos2json(filename, **kwargs):
         json.dump(json_dict, outfile)
 
 
-def pie_layout(mat_f, entity_names, n_cluster, d=1.5, r_const=4, plot_bool=True):
+def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4, plot_bool=True):
     """Computes the "Pie Layout" for the network given by mat_f"""
 
     gr, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
 
     phi = 2 * np.pi / (n_cluster - 1)  # Constant angle of pie given for each cluster
-    r = r_const * d / phi
+    r = r_const * d_xy / phi
     scale_cluster = 0.8
     cmap = plt.get_cmap('cool')
 
@@ -832,11 +832,16 @@ def pie_layout(mat_f, entity_names, n_cluster, d=1.5, r_const=4, plot_bool=True)
         theta_i = phi * (i - 1)
 
         pos = nx.spring_layout(gs, seed=43)
-        pos = normalize_coordinates(pos, diam_xy=d)
+        if risk_mean is None:
+            pos = normalize_coordinates(pos, diam_xy=d_xy, diam_z=d_z)
+        else:
+            # assert risk_cov is not None, "Risk_mean is not None, but Risk_cov is"
+            pos, risk_mean, risk_cov = normalize_coordinates(pos, risk_mean=risk_mean, risk_cov=risk_cov, diam_xy=d_xy,
+                                                             diam_z=d_z)
 
         for node in gs.nodes:
             x, y = pos[node] * scale_cluster
-            pos_pie[node] = np.array(polar2cartesian(r + y, np.pi / 2 - (x / d * phi + theta_i), units='rad'))
+            pos_pie[node] = np.array(polar2cartesian(r + y, np.pi / 2 - (x / d_xy * phi + theta_i), units='rad'))
             node_colors.append(cmap(i / n_cluster))
 
     gt = gr.subgraph(list(pos_pie.keys()))
@@ -844,4 +849,7 @@ def pie_layout(mat_f, entity_names, n_cluster, d=1.5, r_const=4, plot_bool=True)
         fig, ax = plt.subplots(figsize=(10, 6))
         widths = [gt[u][v]['weight'] for u, v in gt.edges]
         nx.draw(gt, pos_pie, with_labels=True, width=widths, ax=ax, node_color=node_colors)
-    return pos_pie, node_colors, r, gt
+    if risk_mean is None:
+        return pos_pie, node_colors, r, gt
+    else:
+        return pos_pie, risk_mean, risk_cov, node_colors, r, gt

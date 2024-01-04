@@ -20,8 +20,9 @@ const dz = 0.01
 
 const effectController = {
     solidEntities: true,
-    showTopology: false,
-    showRisks: false
+    showConnectivity: false,
+    elevateWithRisks: false,
+    colorWithRisks: false
 };
 
 // Read planar positions
@@ -42,14 +43,14 @@ function initGUI(){
 
     } );
 
-    gui.add( effectController, 'showTopology' ).onChange( function ( value ) {
+    gui.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
 
-        edgeTopology.visible = value;
-        edgeConnectivity.visible = !value
+        edgeTopology.visible = !value;
+        edgeConnectivity.visible = value
 
     } );
 
-    gui.add( effectController, 'showRisks' ).onChange( function ( elavate ) {
+    gui.add( effectController, 'elevateWithRisks' ).onChange( function ( elavate ) {
         
         for ( let i = 0; i < nNodes; i ++ ) {
             let name = Object.keys(pos)[i]
@@ -88,8 +89,9 @@ function initGUI(){
         }
         // TODO: Need not update node positions additionally
         for ( let i = 0; i < nNodes; i ++ ) {
+            
+            let dodec = entityGroup.children[i];
 
-            let dodec = entityGroup.children[i]
             dodec.position.set(nodePositions[ 3 * i ], nodePositions[ 3 * i + 1 ], nodePositions[ 3 * i + 2])
             
         }
@@ -102,7 +104,27 @@ function initGUI(){
         entityGroup.children.forEach(element => {
             element.geometry.attributes.position.needsUpdate = true;
         });*/
+    } );
 
+    gui.add( effectController, 'colorWithRisks' ).onChange( function ( value ) {
+
+        if (value == true) {
+            for ( let i = 0; i < nNodes; i ++ ) {
+
+                let name = Object.keys(pos)[i];
+                let dodec = entityGroup.children[i];
+
+                dodec.material.color.setRGB( risk_mean[name] / extras.diam_z , 0, 0);
+            
+            }
+        } else {
+            for ( let i = 0; i < nNodes; i ++ ) {
+
+                let dodec = entityGroup.children[i];
+                dodec.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
+        
+            }
+        }
     } );
 }
 
@@ -142,34 +164,7 @@ function init(){
     //scene.add( helper );
 
     // Pie Outline
-    const pieOutline = new THREE.Group();
-    scene.add(pieOutline)
-
-    const outlineMaterial = new THREE.LineBasicMaterial( { color: 0xffffff } );
-
-    const outerCircle = new THREE.EllipseCurve(
-        0,  0,            // ax, aY
-        extras.radius + extras.diam/2, extras.radius + extras.diam/2,  // xRadius, yRadius
-        0,  2 * Math.PI,  // aStartAngle, aEndAngle
-        false,            // aClockwise
-        0                 // aRotation
-    );
-    let points = outerCircle.getPoints( 1000 );
-    let pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
-    const outerLine = new THREE.Line( pieGeometry, outlineMaterial );
-    pieOutline.add(outerLine)
-
-    const innerCircle = new THREE.EllipseCurve(
-        0,  0,            // ax, aY
-        extras.radius - extras.diam/2, extras.radius - extras.diam/2,  // xRadius, yRadius
-        0,  2 * Math.PI,  // aStartAngle, aEndAngle
-        false,            // aClockwise
-        0                 // aRotation
-    );
-    points = innerCircle.getPoints( 1000 );
-    pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
-    const innerLine = new THREE.Line( pieGeometry, outlineMaterial );
-    pieOutline.add(innerLine)
+    const pieOutline = makeOutliine(scene)
     console.log(pieOutline)
 
     // Renderer
@@ -234,13 +229,12 @@ function init(){
         dodec.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entityGroup.add( dodec );
     }
-    console.log(entityGroup)
+
     // Edges
 
     makeEdgePositions(topologyEdges, false);
     
     // Network Topology
-
     const edgeTopologyGeometry = new THREE.BufferGeometry()
     edgeTopologyGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePositions, 3 ) );
     
@@ -249,7 +243,7 @@ function init(){
     });
     
     edgeTopology = new THREE.LineSegments( edgeTopologyGeometry, edgeTopologyMaterial );
-    edgeTopology.visible = false
+    edgeTopology.visible = !effectController.showConnectivity
     scene.add( edgeTopology );
 
     // Connectivity
@@ -258,7 +252,7 @@ function init(){
     const edgeConnectivityGeometry = new THREE.BufferGeometry()
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( allEdgePositions, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
-    console.log(edgeConnectivityGeometry)
+    
     /*
     const edgeConnectivityMaterial = new THREE.LineBasicMaterial({
         //color: 0xbf0000,
@@ -274,6 +268,7 @@ function init(){
 
     edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     scene.add( edgeConnectivity );
+    edgeConnectivity.visible = effectController.showConnectivity;
 
     const controls = new OrbitControls( camera, renderer.domElement );   
     
@@ -346,6 +341,58 @@ function makeAllEdges(elavate) {
             edgeColors[ 8 * k + 7] = edgeColors[ 8 * k + 3];
         }
     }
+}
+
+function makeOutliine( scene ) {
+    const pieOutline = new THREE.Group();
+    scene.add(pieOutline);
+
+    const outlineMaterial = new THREE.LineBasicMaterial( { color: 0xffffff } );
+
+    const outerCircle = new THREE.EllipseCurve(
+        0,  0,            // ax, aY
+        extras.radius + extras.diam_xy/2, extras.radius + extras.diam_xy/2,  // xRadius, yRadius
+        0,  2 * Math.PI,  // aStartAngle, aEndAngle
+        false,            // aClockwise
+        0                 // aRotation
+    );
+    let points = outerCircle.getPoints( 1000 );
+    let pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
+    const outerLine = new THREE.Line( pieGeometry, outlineMaterial );
+    pieOutline.add(outerLine);
+
+    const innerCircle = new THREE.EllipseCurve(
+        0,  0,            // ax, aY
+        extras.radius - extras.diam_xy/2, extras.radius - extras.diam_xy/2,  // xRadius, yRadius
+        0,  2 * Math.PI,  // aStartAngle, aEndAngle
+        false,            // aClockwise
+        0                 // aRotation
+    );
+    points = innerCircle.getPoints( 1000 );
+    pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
+    const innerLine = new THREE.Line( pieGeometry, outlineMaterial );
+    pieOutline.add(innerLine);
+
+    // The Line Segments
+
+    const n_segments = extras.n_cluster - 1;
+
+    for (let i = 0; i < n_segments ; i++) {
+        
+        const phi = 2 * Math.PI / n_segments;
+        let nu_i = phi * i + phi / 2;
+
+        let points = [];
+        points.push( new THREE.Vector3( (extras.radius - extras.diam_xy/2) * Math.sin( nu_i),
+                                        (extras.radius - extras.diam_xy/2) * Math.cos( nu_i), 0 ) );
+        points.push( new THREE.Vector3( (extras.radius + extras.diam_xy/2) * Math.sin( nu_i),
+                                        (extras.radius + extras.diam_xy/2) * Math.cos( nu_i), 0 ) );
+
+        const geometry = new THREE.BufferGeometry().setFromPoints( points );
+        const line = new THREE.Line( geometry, outlineMaterial );
+        pieOutline.add(line);
+    }
+    return pieOutline
 }
 
 function animate() {
