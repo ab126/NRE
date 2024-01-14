@@ -9,6 +9,8 @@ import pandas as pd
 import seaborn as sns
 
 from matplotlib.lines import Line2D
+from networkx.utils import np_random_state
+from networkx.drawing.layout import rescale_layout
 
 from src.network_connectivity import ConnectivityUnit
 from src.network_partitioning import apply_spec_clus
@@ -785,7 +787,8 @@ def normalize_coordinates(pos, risk_mean=None, risk_cov=None, diam_xy=4.0, diam_
             max_risk = max(val, max_risk)
 
     # Adjust diam
-    mult_x, mult_y = diam_xy / (max_x - min_x), diam_xy / (max_y - min_y)
+    mult_x = diam_xy / (max_x - min_x) if max_x != min_x else 1
+    mult_y = diam_xy / (max_y - min_y) if max_y != min_y else 1
     mult_z = diam_z / max_risk if risk_mean is not None else 1
     base_xy = np.array([min_x, min_y])
     for node in pos:
@@ -812,7 +815,8 @@ def pos2json(filename, **kwargs):
         json.dump(json_dict, outfile)
 
 
-def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4, plot_bool=True):
+def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4,
+               plot_bool=True):
     """Computes the "Pie Layout" for the network given by mat_f"""
 
     gr, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
@@ -825,8 +829,7 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
     pos_pie = {}
     node_colors = []
     for i in clusters:
-        if i == 0:
-            continue
+
         ind = new_labels == i
         gs = gr.subgraph(np.array(gr.nodes)[ind])
         theta_i = phi * (i - 1)
@@ -841,7 +844,10 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
 
         for node in gs.nodes:
             x, y = pos[node] * scale_cluster
-            pos_pie[node] = np.array(polar2cartesian(r + y, np.pi / 2 - (x / d_xy * phi + theta_i), units='rad'))
+            if i == 0:
+                pos_pie[node] = np.array([x, y])
+            else:
+                pos_pie[node] = np.array(polar2cartesian(r + y, np.pi / 2 - (x / d_xy * phi + theta_i), units='rad'))
             node_colors.append(cmap(i / n_cluster))
 
     gt = gr.subgraph(list(pos_pie.keys()))
@@ -853,3 +859,236 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
         return pos_pie, node_colors, r, gt
     else:
         return pos_pie, risk_mean, risk_cov, node_colors, r, gt
+
+
+# --------------------------------------------------------------------------------
+# Taken and modified from NetworkX library. See
+# https://networkx.org/documentation/stable/_modules/networkx/drawing/layout.html
+# --------------------------------------------------------------------------------
+def _process_params(G, center, dim):
+    # Some boilerplate code.
+
+    if not isinstance(G, nx.Graph):
+        empty_graph = nx.Graph()
+        empty_graph.add_nodes_from(G)
+        G = empty_graph
+
+    if center is None:
+        center = np.zeros(dim)
+    else:
+        center = np.asarray(center)
+
+    if len(center) != dim:
+        msg = "length of center coordinates must match dimension of layout"
+        raise ValueError(msg)
+
+    return G, center
+
+
+@np_random_state(10)
+def spring_layout(
+        G,
+        k=None,
+        pos=None,
+        fixed=None,
+        iterations=50,
+        threshold=1e-4,
+        weight="weight",
+        scale=1,
+        center=None,
+        dim=2,
+        seed=None,
+):
+    """Position nodes using Fruchterman-Reingold force-directed algorithm.
+
+    The algorithm simulates a force-directed representation of the network
+    treating edges as springs holding nodes close, while treating nodes
+    as repelling objects, sometimes called an anti-gravity force.
+    Simulation continues until the positions are close to an equilibrium.
+
+    There are some hard-coded values: minimal distance between
+    nodes (0.01) and "temperature" of 0.1 to ensure nodes don't fly away.
+    During the simulation, `k` helps determine the distance between nodes,
+    though `scale` and `center` determine the size and place after
+    rescaling occurs at the end of the simulation.
+
+    Fixing some nodes doesn't allow them to move in the simulation.
+    It also turns off the rescaling feature at the simulation's end.
+    In addition, setting `scale` to `None` turns off rescaling.
+
+    Parameters
+    ----------
+    G : NetworkX graph or list of nodes
+        A position will be assigned to every node in G.
+
+    k : float (default=None)
+        Optimal distance between nodes.  If None the distance is set to
+        1/sqrt(n) where n is the number of nodes.  Increase this value
+        to move nodes farther apart.
+
+    pos : dict or None  optional (default=None)
+        Initial positions for nodes as a dictionary with node as keys
+        and values as a coordinate list or tuple.  If None, then use
+        random initial positions.
+
+    fixed : list or None  optional (default=None)
+        Nodes to keep fixed at initial position.
+        Nodes not in ``G.nodes`` are ignored.
+        ValueError raised if `fixed` specified and `pos` not.
+
+    iterations : int  optional (default=50)
+        Maximum number of iterations taken
+
+    threshold: float optional (default = 1e-4)
+        Threshold for relative error in node position changes.
+        The iteration stops if the error is below this threshold.
+
+    weight : string or None   optional (default='weight')
+        The edge attribute that holds the numerical value used for
+        the edge weight.  Larger means a stronger attractive force.
+        If None, then all edge weights are 1.
+
+    scale : number or None (default: 1)
+        Scale factor for positions. Not used unless `fixed is None`.
+        If scale is None, no rescaling is performed.
+
+    center : array-like or None
+        Coordinate pair around which to center the layout.
+        Not used unless `fixed is None`.
+
+    dim : int
+        Dimension of layout.
+
+    seed : int, RandomState instance or None  optional (default=None)
+        Set the random state for deterministic node layouts.
+        If int, `seed` is the seed used by the random number generator,
+        if numpy.random.RandomState instance, `seed` is the random
+        number generator,
+        if None, the random number generator is the RandomState instance used
+        by numpy.random.
+
+    Returns
+    -------
+    pos : dict
+        A dictionary of positions keyed by node
+
+    """
+    G, center = _process_params(G, center, dim)
+
+    if fixed is not None:
+        if pos is None:
+            raise ValueError("nodes are fixed without positions given")
+        for node in fixed:
+            if node not in pos:
+                raise ValueError("nodes are fixed without positions given")
+        nfixed = {node: i for i, node in enumerate(G)}
+        fixed = np.asarray([nfixed[node] for node in fixed if node in nfixed])
+
+    if pos is not None:
+        # Determine size of existing domain to adjust initial positions
+        dom_size = max(coord for pos_tup in pos.values() for coord in pos_tup)
+        if dom_size == 0:
+            dom_size = 1
+        pos_arr = seed.rand(len(G), dim) * dom_size + center
+
+        for i, n in enumerate(G):
+            if n in pos:
+                pos_arr[i] = np.asarray(pos[n])
+    else:
+        pos_arr = None
+        dom_size = 1
+
+    if len(G) == 0:
+        return {}
+    if len(G) == 1:
+        return {nx.utils.arbitrary_element(G.nodes()): center}
+
+    try:
+        # Sparse matrix
+        if len(G) < 500:  # sparse solver for large graphs
+            raise ValueError
+        A = nx.to_scipy_sparse_array(G, weight=weight, dtype="f")
+        if k is None and fixed is not None:
+            # We must adjust k by domain size for layouts not near 1x1
+            nnodes, _ = A.shape
+            k = dom_size / np.sqrt(nnodes)
+        raise NotImplementedError("Modified Fruchterman Reingold not implemented for sparse matrices")
+
+        # pos = _sparse_fruchterman_reingold(
+        #     A, k, pos_arr, fixed, iterations, threshold, dim, seed
+        # )
+
+    except ValueError:
+        A = nx.to_numpy_array(G, weight=weight)
+        if k is None and fixed is not None:
+            # We must adjust k by domain size for layouts not near 1x1
+            nnodes, _ = A.shape
+            k = dom_size / np.sqrt(nnodes)
+        pos = _fruchterman_reingold(
+            A, k, pos_arr, fixed, iterations, threshold, dim, seed
+        )
+    if fixed is None and scale is not None:
+        pos = rescale_layout(pos, scale=scale) + center
+    pos = dict(zip(G, pos))
+    return pos
+
+
+@np_random_state(7)
+def _fruchterman_reingold(
+        A, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, dim=2, seed=None
+):
+    # Position nodes in adjacency matrix A using Fruchterman-Reingold
+    # Entry point for NetworkX graph is fruchterman_reingold_layout()
+
+    try:
+        nnodes, _ = A.shape
+    except AttributeError as err:
+        msg = "fruchterman_reingold() takes an adjacency matrix as input"
+        raise nx.NetworkXError(msg) from err
+
+    if pos is None:
+        # random initial positions
+        pos = np.asarray(seed.rand(nnodes, dim), dtype=A.dtype)
+    else:
+        # make sure positions are of same type as matrix
+        pos = pos.astype(A.dtype)
+
+    # optimal distance between nodes
+    if k is None:
+        k = np.sqrt(1.0 / nnodes)
+    # the initial "temperature"  is about .1 of domain area (=1x1)
+    # this is the largest step allowed in the dynamics.
+    # We need to calculate this in case our fixed positions force our domain
+    # to be much bigger than 1x1
+    t = max(max(pos.T[0]) - min(pos.T[0]), max(pos.T[1]) - min(pos.T[1])) * 0.1
+    # simple cooling scheme.
+    # linearly step down by dt on each iteration so last iteration is size dt.
+    dt = t / (iterations + 1)
+    delta = np.zeros((pos.shape[0], pos.shape[0], pos.shape[1]), dtype=A.dtype)
+    # the inscrutable (but fast) version
+    # this is still O(V^2)
+    # could use multilevel methods to speed this up significantly
+    for iteration in range(iterations):
+        # matrix of difference between points
+        delta = pos[:, np.newaxis, :] - pos[np.newaxis, :, :]
+        # distance between points
+        distance = np.linalg.norm(delta, axis=-1)
+        # enforce minimum distance of 0.01
+        np.clip(distance, 0.01, None, out=distance)
+        # displacement "force"
+        displacement = np.einsum(
+            "ijk,ij->ik", delta, (k * k / distance ** 2 - A * distance / k)  # TODO: Add here
+        )
+        # update positions
+        length = np.linalg.norm(displacement, axis=-1)
+        length = np.where(length < 0.01, 0.1, length)
+        delta_pos = np.einsum("ij,i->ij", displacement, t / length)
+        if fixed is not None:
+            # don't change positions of fixed nodes
+            delta_pos[fixed] = 0.0
+        pos += delta_pos
+        # cool temperature
+        t -= dt
+        if (np.linalg.norm(delta_pos) / nnodes) < threshold:
+            break
+    return pos
