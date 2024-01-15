@@ -885,9 +885,11 @@ def _process_params(G, center, dim):
     return G, center
 
 
-@np_random_state(10)
-def spring_layout(
-        G,
+#@np_random_state(10)
+def risk_elevation_layout(
+        g,
+        risks=None,
+        alpha=0.2,
         k=None,
         pos=None,
         fixed=None,
@@ -899,11 +901,13 @@ def spring_layout(
         dim=2,
         seed=None,
 ):
-    """Position nodes using Fruchterman-Reingold force-directed algorithm.
+    """Position nodes using Fruchterman-Reingold force-directed algorithm with
+     elevation according to risks.
 
     The algorithm simulates a force-directed representation of the network
     treating edges as springs holding nodes close, while treating nodes
-    as repelling objects, sometimes called an anti-gravity force.
+    as repelling objects, sometimes called an anti-gravity force in addition
+    to an elevating force proportional to risks.
     Simulation continues until the positions are close to an equilibrium.
 
     There are some hard-coded values: minimal distance between
@@ -918,8 +922,14 @@ def spring_layout(
 
     Parameters
     ----------
-    G : NetworkX graph or list of nodes
+    g : NetworkX graph or list of nodes
         A position will be assigned to every node in G.
+
+    risks : np 1d-array
+        Estimated entity risks according to NRE
+
+    alpha : float
+        Coefficient for risk elevation force
 
     k : float (default=None)
         Optimal distance between nodes.  If None the distance is set to
@@ -973,7 +983,7 @@ def spring_layout(
         A dictionary of positions keyed by node
 
     """
-    G, center = _process_params(G, center, dim)
+    g, center = _process_params(g, center, dim)
 
     if fixed is not None:
         if pos is None:
@@ -981,7 +991,7 @@ def spring_layout(
         for node in fixed:
             if node not in pos:
                 raise ValueError("nodes are fixed without positions given")
-        nfixed = {node: i for i, node in enumerate(G)}
+        nfixed = {node: i for i, node in enumerate(g)}
         fixed = np.asarray([nfixed[node] for node in fixed if node in nfixed])
 
     if pos is not None:
@@ -989,25 +999,25 @@ def spring_layout(
         dom_size = max(coord for pos_tup in pos.values() for coord in pos_tup)
         if dom_size == 0:
             dom_size = 1
-        pos_arr = seed.rand(len(G), dim) * dom_size + center
+        pos_arr = seed.rand(len(g), dim) * dom_size + center
 
-        for i, n in enumerate(G):
+        for i, n in enumerate(g):
             if n in pos:
                 pos_arr[i] = np.asarray(pos[n])
     else:
         pos_arr = None
         dom_size = 1
 
-    if len(G) == 0:
+    if len(g) == 0:
         return {}
-    if len(G) == 1:
-        return {nx.utils.arbitrary_element(G.nodes()): center}
+    if len(g) == 1:
+        return {nx.utils.arbitrary_element(g.nodes()): center}
 
     try:
         # Sparse matrix
-        if len(G) < 500:  # sparse solver for large graphs
+        if len(g) < 500:  # sparse solver for large graphs
             raise ValueError
-        A = nx.to_scipy_sparse_array(G, weight=weight, dtype="f")
+        A = nx.to_scipy_sparse_array(g, weight=weight, dtype="f")
         if k is None and fixed is not None:
             # We must adjust k by domain size for layouts not near 1x1
             nnodes, _ = A.shape
@@ -1019,39 +1029,49 @@ def spring_layout(
         # )
 
     except ValueError:
-        A = nx.to_numpy_array(G, weight=weight)
+        A = nx.to_numpy_array(g, weight=weight)
         if k is None and fixed is not None:
             # We must adjust k by domain size for layouts not near 1x1
             nnodes, _ = A.shape
             k = dom_size / np.sqrt(nnodes)
-        pos = _fruchterman_reingold(
-            A, k, pos_arr, fixed, iterations, threshold, dim, seed
+        pos = _modified_fruchterman_reingold(
+            A, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations, threshold=threshold, dim=dim, seed=seed
         )
     if fixed is None and scale is not None:
         pos = rescale_layout(pos, scale=scale) + center
-    pos = dict(zip(G, pos))
+    pos = dict(zip(g, pos))
     return pos
 
 
-@np_random_state(7)
-def _fruchterman_reingold(
-        A, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, dim=2, seed=None
+#@np_random_state(7)
+def _modified_fruchterman_reingold(
+        mat_a, risks=None, alpha=0.2, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, dim=2, seed=None
 ):
     # Position nodes in adjacency matrix A using Fruchterman-Reingold
     # Entry point for NetworkX graph is fruchterman_reingold_layout()
+    np.random.seed(seed)
+
+    if dim != 2:
+        raise NotImplementedError("Only implemented for dim=2")
 
     try:
-        nnodes, _ = A.shape
+        nnodes, _ = mat_a.shape
     except AttributeError as err:
         msg = "fruchterman_reingold() takes an adjacency matrix as input"
         raise nx.NetworkXError(msg) from err
 
+    if risks is None:
+        risks = np.zeros(nnodes)
+    else:
+        risks -= np.mean(risks)
+        risks /= np.linalg.norm(risks) if np.linalg.norm(risks) != 0 else np.zeros(nnodes)
+
     if pos is None:
         # random initial positions
-        pos = np.asarray(seed.rand(nnodes, dim), dtype=A.dtype)
+        pos = np.asarray(np.random.rand(nnodes, dim), dtype=mat_a.dtype)
     else:
         # make sure positions are of same type as matrix
-        pos = pos.astype(A.dtype)
+        pos = pos.astype(mat_a.dtype)
 
     # optimal distance between nodes
     if k is None:
@@ -1064,7 +1084,7 @@ def _fruchterman_reingold(
     # simple cooling scheme.
     # linearly step down by dt on each iteration so last iteration is size dt.
     dt = t / (iterations + 1)
-    delta = np.zeros((pos.shape[0], pos.shape[0], pos.shape[1]), dtype=A.dtype)
+    delta = np.zeros((pos.shape[0], pos.shape[0], pos.shape[1]), dtype=mat_a.dtype)
     # the inscrutable (but fast) version
     # this is still O(V^2)
     # could use multilevel methods to speed this up significantly
@@ -1077,12 +1097,14 @@ def _fruchterman_reingold(
         np.clip(distance, 0.01, None, out=distance)
         # displacement "force"
         displacement = np.einsum(
-            "ijk,ij->ik", delta, (k * k / distance ** 2 - A * distance / k)  # TODO: Add here
+            "ijk,ij->ik", delta, (k * k / distance ** 2 - mat_a * distance / k)  # Standard Fruchterman-Reingold
         )
+        displacement[:, 1] += alpha * risks  # Modification due to risk elevation
+
         # update positions
         length = np.linalg.norm(displacement, axis=-1)
-        length = np.where(length < 0.01, 0.1, length)
-        delta_pos = np.einsum("ij,i->ij", displacement, t / length)
+        length = np.where(length < 0.01, 0.1, length)  # Clip length
+        delta_pos = np.einsum("ij,i->ij", displacement, t / length)  # Scale
         if fixed is not None:
             # don't change positions of fixed nodes
             delta_pos[fixed] = 0.0
