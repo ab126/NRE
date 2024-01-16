@@ -889,11 +889,11 @@ def _process_params(G, center, dim):
 def risk_elevation_layout(
         g,
         risks=None,
-        alpha=0.2,
+        alpha=2,
         k=None,
         pos=None,
         fixed=None,
-        iterations=50,
+        iterations=500,
         threshold=1e-4,
         weight="weight",
         scale=1,
