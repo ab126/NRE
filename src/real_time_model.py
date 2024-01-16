@@ -3,15 +3,14 @@ from src.network_connectivity import ConnectivityUnit
 from src.kalman_network_tools import single_risk_update
 
 
-# TODO: Write a class that implements all the necessary functions for a single graph window in another module
+# TODO: This class should deal with the whole network. Add detailed docs (?)
 
 class NetworkModel:
     """
         Base unit for updating risk estimates from previous estimates and connection data
     """
 
-    def __init__(self, entity_names=None, mat_x_init=None, mat_p_init=None,
-                 mat_q=None):
+    def __init__(self, entity_names=None, mat_x_init=None, mat_p_init=None, mat_q=None):
         """
         :param entity_names: List of entity names
         :param mat_x_init: Initial risk estimate as 1d np.array
@@ -24,6 +23,7 @@ class NetworkModel:
         self.mat_p = mat_p_init
         self.mat_q = mat_q
 
+    # TODO: Make compatible with lower level class ConnectivityUnit.update_new_tick
     def update_new_tick(self, df_conn, measurement=None, mat_h=None, mat_r=None, keep_unit=False, relief_factor=0.6,
                         **kwargs):
         """
@@ -42,10 +42,14 @@ class NetworkModel:
         df = preprocess_df(df_conn, date_col=' Timestamp')
         cu = ConnectivityUnit()
         cu.read_flows(df, entity_names=self.entity_names, window_type='time', **kwargs)
-        cu.fit_graph_model(method='cov', verbose=True)
+        cu.fit_connectivity_model(method='cov', verbose=True)
         if keep_unit:
             self.cu = cu
 
-        self.mat_x, self.mat_p = single_risk_update(cu.F, measurement=measurement, mat_h=mat_h, mat_x_init=self.mat_x,
+        self.mat_x, self.mat_p = single_risk_update(cu.mat_f, measurement=measurement, mat_h=mat_h, mat_x_init=self.mat_x,
                                                     mat_p_init=self.mat_p, mat_q=self.mat_q, mat_r=mat_r, k_steps=1,
                                                     relief_factor=relief_factor, normalize=False)
+
+    def partition_network(self):
+        # TODO: """ Partitions the network into subnetworks for simplicity"""
+        pass
