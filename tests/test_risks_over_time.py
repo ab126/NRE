@@ -23,12 +23,12 @@ nm = ConnectivityUnit()
 nm.read_flows(df, conn_param='Num Packets Received', entity_names=entity_names,
               window_type='time', sync_window_size=1.2, time_scale='sec')
 
-nm.fit_graph_model(method='cov')  # cov
+nm.fit_connectivity_model(method='cov')  # cov
 nm.plot_f(labels=True)
 mthd_name = 'Corr. Coeff.'
 
 nn = 4
-all_graphs = [nm.F for i in range(nn)]
+all_graphs = [nm.mat_f for i in range(nn)]
 all_graphs = np.array(all_graphs)
 all_measurements = [None for _ in range(nn)]
 all_measurements[1] = [5.6]

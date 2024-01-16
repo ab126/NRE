@@ -84,7 +84,7 @@ if __name__ == '__main__':  # TODO: Add test for connection size windowing
     print('\nDf to samples time (s): ', end - start, '\n')
 
     start = time.time()
-    nm.fit_graph_model()
+    nm.fit_connectivity_model()
     nm.plot_f()
     end = time.time()
     print('\nSamples to Graph time (s): ', end - start)

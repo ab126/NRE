@@ -272,7 +272,7 @@ def score_evaluation(df, entity_names, w, conn_param='Num Packets Rec', batch_si
                 if domain_type == 'freq':
                     nm.apply_dft_mag()
                 for method in methods:
-                    nm.fit_graph_model(method=method)
+                    nm.fit_connectivity_model(method=method)
                     if win_type == 'time':
                         windows_str = str(time_window) + time_scale_dict[time_scale] + ' '
                     else:
@@ -293,7 +293,7 @@ def score_evaluation(df, entity_names, w, conn_param='Num Packets Rec', batch_si
                     mat_r = np.eye(n_z, n_z) / 10 ** 2
                     mat_h = np.zeros((n_z, n_entity))  # Not used
 
-                    mat_f = nm.F.copy()
+                    mat_f = nm.mat_f.copy()
                     mat_x_kf = mat_x_init.copy()
                     mat_p_kf = mat_p_init.copy()
                     k_steps = 15
@@ -412,9 +412,9 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
                       date_col=date_col, time_scale=time_scale, **kwargs)
         if verbose:
             print('Current time and samples shape: ', current_datetime, cu.samples.shape)
-        cu.fit_graph_model(method=method, verbose=False)  # cov
+        cu.fit_connectivity_model(method=method, verbose=False)  # cov
 
-        g = nx.from_numpy_array(cu.F, create_using=nx.DiGraph)
+        g = nx.from_numpy_array(cu.mat_f, create_using=nx.DiGraph)
         g = nx.relabel_nodes(g, {entity_names.index(node): node for node in entity_names})
         g.add_weighted_edges_from([(node, node, 1) for node in entity_names])
         temp_graph = np.asarray(nx.to_numpy_array(g, nodelist=entity_names))
