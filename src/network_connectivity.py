@@ -345,6 +345,16 @@ class ConnectivityUnit:
             ax.xaxis.set_ticks_position('bottom')
         plt.show()
 
+    def clip_f(self, low=None, high=None, low_val=0, high_val=1):
+        """
+        In the connectivity matrix F, values lower than 'low' are assigned as 'low_val'
+        and values higher than 'high' are assigned as 'high_val'
+        """
+        if low is not None:
+            self.F = np.where(self.F < low, low_val, self.F)
+        if high is not None:
+            self.F = np.where(self.F > high, high_val, self.F)
+
 
 def get_all_entities(df, src_id_col=' Source IP', dst_id_col=' Destination IP'):
     """
