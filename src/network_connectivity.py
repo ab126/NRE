@@ -53,7 +53,7 @@ class ConnectivityUnit:
         self.conn_param_specs = cic_conn_param_specs
         self.samples = np.array([[]])
         self.names = []
-        self.num_appearances = []
+        self.num_appearances = []  # Number of times entities appear in connection data 
         self.mat_f = np.array([[]])
 
         # Model Parameters
@@ -63,9 +63,9 @@ class ConnectivityUnit:
         self.m_di = 3  # (applies only for method='di') Memory length for calculating Directed Information
 
         # Risk Estimation related fields
-        self.mat_x = mat_x_init
-        self.mat_p = mat_p_init
-        self.mat_q = mat_q
+        self.mat_x = mat_x_init if mat_x_init is not None else np.array([])
+        self.mat_p = mat_p_init if mat_p_init is not None else np.array([[]])
+        self.mat_q = mat_q if mat_q is not None else np.array([[]])
         self.mat_r = np.array([[]])
 
     def read_flows(self, df, entity_names=None, window_type='time', date_col=' Timestamp', last_datetime=None,
@@ -171,7 +171,7 @@ class ConnectivityUnit:
 
         self.samples = np.array(samples, dtype='float')
         self.names = sub_net_names
-        self.num_appearances = num_appearances
+        self.num_appearances = np.array(num_appearances, dtype='float')
 
     def apply_dft_mag(self):
         """Applies magnitude of fft to samples on nodes"""
@@ -359,6 +359,32 @@ class ConnectivityUnit:
             ax.xaxis.set_ticks_position('bottom')
         plt.show()
 
+    # Partitioning Related Methods
+    def remove_infrequent(self, thr=1000):
+        """ Removes the entities with occurrence less than a threshold in the connection data"""
+
+        new_names = []
+        for name, occurrence in zip(self.names, self.num_appearances):
+            if occurrence >= thr:
+                new_names.append(name)
+
+        old_names = np.array(self.names)
+        new_names = np.array(new_names)
+        ind = np.isin(old_names, new_names)
+
+        self.names = list(old_names[ind])
+        self.samples = self.samples[:, ind].copy()
+        self.num_appearances = self.num_appearances[ind].copy()
+        self.mat_f = self.mat_f[np.ix_(ind, ind)].copy()
+        self.mat_r = self.mat_r[np.ix_(ind, ind)].copy()
+        self.mat_x = self.mat_x[ind].copy()
+        self.mat_p = self.mat_p[np.ix_(ind, ind)].copy()
+        # TODO: Test this
+
+    def apply_partitioning(self):
+        """ Partitions the network with spectral partitioning algorithm"""
+        pass
+
     def clip_f(self, low=None, high=None, low_val=0, high_val=1, inplace=True):
         """
         In the connectivity matrix mat_f, values lower than 'low' are assigned as 'low_val'
@@ -374,6 +400,7 @@ class ConnectivityUnit:
         else:
             return self.mat_f.copy()
 
+    # Risk Estimation related Methods
     # TODO: More on risk estimation side...
     def update_new_tick(self, df_conn, measurement=None, mat_h=None, mat_r=None, relief_factor=0.6, **kwargs):
         """
