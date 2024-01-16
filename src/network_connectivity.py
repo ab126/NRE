@@ -2,8 +2,12 @@ import matplotlib
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+
+from .kalman_network_tools import single_risk_update
 from .npeet import npeet_entropy_estimators as ee
 from ordered_set import OrderedSet
+
+from .preprocess import preprocess_df
 from .time_windowed import get_window
 import scipy.fft
 from pomegranate.bayesian_network import BayesianNetwork
@@ -11,15 +15,13 @@ from src.archive.bbn_functions import get_DAG_from_model
 
 MIN_SAMPLES = 5  # Minimum number of samples required for MI calculation
 
-# TODO: Cant check CICFlowFeaatures, the csv file is gone... Unsure about Response Time, Packet Delay,
-#  Num Active Packets, Active Time. Other than that looks good
 cic_conn_param_specs = {
     'Port Num': {'method': 'last', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
     'Protocol': {'method': 'last', 'src_feature_col': ' Protocol', 'dst_feature_col': ' Protocol'},
     'NPS': {'method': 'total', 'src_feature_col': ' Total Fwd Packets',
-                         'dst_feature_col': ' Total Backward Packets'},  # Number of Packets Sent
+            'dst_feature_col': ' Total Backward Packets'},  # Number of Packets Sent
     'NPR': {'method': 'total', 'src_feature_col': ' Total Backward Packets',
-                             'dst_feature_col': ' Total Fwd Packets'},  # Number of Packets Received
+            'dst_feature_col': ' Total Fwd Packets'},  # Number of Packets Received
     'Packet Length': {'method': 'average', 'src_feature_col': ' Fwd Packet Length Mean',
                       'dst_feature_col': ' Bwd Packet Length Mean'},
     'Flow Duration': {'method': 'total', 'src_feature_col': ' Flow Duration', 'dst_feature_col': ' Flow Duration'},
@@ -36,14 +38,15 @@ cic_conn_param_specs = {
 }
 
 
+# TODO: Move estimate risks to here
 class ConnectivityUnit:
     """
-    Base unit for analyzing entity connectivity/relationships.
+    Base unit for analyzing entity connectivity/relationships in subnetworks.
+        Main methods are read flow data, fit the connectivity model to it and estimate risks.
     """
 
-    def __init__(self, loss_thr=9999):
+    def __init__(self, loss_thr=9999, mat_x_init=None, mat_p_init=None, mat_q=None):
 
-        self.loss_thr = loss_thr  # loss is 0 if X and Y are independent
         self.conn_params = ['Activation', 'Num Packets Sent', 'Num Packets Rec', 'Packet Length',
                             'Flow Duration', 'Flow Speed', 'Response Time', 'Packet Delay', 'Header Length',
                             'Num Active Packets', 'Active Time', 'Idle Time']
@@ -51,13 +54,19 @@ class ConnectivityUnit:
         self.samples = np.array([[]])
         self.names = []
         self.num_appearances = []
+        self.mat_f = np.array([[]])
 
-        self.base = 2
+        # Model Parameters
+        self.loss_thr = loss_thr  # loss is 0 if X and Y are independent
+        self.base = 2  # Logarithm base for entropy-related functions
         self.mi_mapping = lambda x: np.sqrt(1 - np.power(self.base, -(np.abs(x) + x) / 2))  # np.tanh
         self.m_di = 3  # (applies only for method='di') Memory length for calculating Directed Information
 
-        self.F = np.array([[]])
-        self.R = np.array([[]])
+        # Risk Estimation related fields
+        self.mat_x = mat_x_init
+        self.mat_p = mat_p_init
+        self.mat_q = mat_q
+        self.mat_r = np.array([[]])
 
     def read_flows(self, df, entity_names=None, window_type='time', date_col=' Timestamp', last_datetime=None,
                    sync_window_size=1.2, time_scale='sec', conn_size=50, src_id_col=' Source IP',
@@ -164,10 +173,6 @@ class ConnectivityUnit:
         self.names = sub_net_names
         self.num_appearances = num_appearances
 
-    def read_stream(self):
-        """ A function to read stream of data"""
-        pass
-
     def apply_dft_mag(self):
         """Applies magnitude of fft to samples on nodes"""
         self.samples = np.abs(scipy.fft.fft(self.samples, axis=0, norm="forward"))
@@ -202,10 +207,10 @@ class ConnectivityUnit:
         """Set the loss threshold for naive bayes graph inference"""
         self.loss_thr = loss_thr  # loss is 0 if X and Y are independent
 
-    def fit_graph_model(self, method='cov', verbose=True):
+    def fit_connectivity_model(self, method='cov', infer_mat_r=False, verbose=True, clear_samples=False):
         """
         Fits the Graph model mat_f and the noise matrix mat_r using the method given
-        -------------
+        ---------------------------------
         :param method: Method for fitting the graph model to samples
                 'bbn': Bayesian Belief Network Search Methods for DiGraph
                 'nb_old' : # Old Naive Bayes Method
@@ -216,7 +221,9 @@ class ConnectivityUnit:
                     entities, with given memory length
                 'cov' : (default) Correlation Coefficient Method where every edge weight is the Corr. Coeff. between
                     respective samples of entities
+        :param infer_mat_r: If True, infers the measurement noise covariance matrix from samples
         :param verbose: If True, prints graph matrix, mat_f, stability measures
+        :param clear_samples: If True clears the samples to recover memory
         :return : None
         """
         if method == 'bbn':
@@ -227,7 +234,7 @@ class ConnectivityUnit:
 
             sample_cov = nx.adjacency_matrix(g_learnt, self.names)
             sample_cov = sample_cov.todense()
-            self.F = sample_cov
+            self.mat_f = sample_cov
 
         elif method == 'nb_old':
             mat_f = np.zeros((len(self.names), len(self.names)))
@@ -247,7 +254,7 @@ class ConnectivityUnit:
                     if loss < self.loss_thr:
                         mat_f[i, j] = -loss
                         mat_f[j, i] = -loss
-            self.F = mat_f
+            self.mat_f = mat_f
 
         elif method == 'mi':
             mat_f = np.zeros((len(self.names), len(self.names)))
@@ -267,7 +274,7 @@ class ConnectivityUnit:
                     if loss < self.loss_thr:
                         mat_f[i, j] = -loss
                         mat_f[j, i] = -loss
-            self.F = mat_f
+            self.mat_f = mat_f
 
         elif method == 'mi_gauss':
             _, sample_cov = fit_mvn_to_samples(self.samples)
@@ -296,7 +303,7 @@ class ConnectivityUnit:
 
                     if loss < self.loss_thr:
                         mat_f[i, j] = -loss
-            self.F = mat_f
+            self.mat_f = mat_f
 
         elif method == 'di':
             mat_f = np.zeros((len(self.names), len(self.names)))
@@ -313,28 +320,35 @@ class ConnectivityUnit:
                     loss = - self.mi_mapping(2 * di1_2)
                     if loss < self.loss_thr:
                         mat_f[i, j] = -loss
-            self.F = mat_f
+            self.mat_f = mat_f
 
         else:  # Covariance Method (Assuming gaussian RVs)
             _, sample_cov = fit_mvn_to_samples(self.samples)
 
             mat_f, mat_r = get_mat_f_q_from_covariance(sample_cov)
-            self.F = mat_f
-            self.R = mat_r
-        self.check_stability(self.F, verbose=verbose)
+            self.mat_f = mat_f
+            if infer_mat_r:
+                self.mat_r = mat_r
+        self.check_stability(self.mat_f, verbose=verbose)
+        if clear_samples:
+            self.flush_samples()
 
     def check_stability(self, mat_a=False, verbose=True):
         """Check if the matrix mat_a is stable"""
         if not np.any(mat_a):
-            mat_a = self.F
+            mat_a = self.mat_f
         cond_num = np.linalg.cond(mat_a)
         d = np.linalg.det(mat_a.T * mat_a)
         if verbose is True:
             print('Conditioning number: ', cond_num, '\nDeterminant of F^T*F: ', d)
 
+    def flush_samples(self):
+        """ Removes the samples after processing"""
+        self.samples = np.array([[]])
+
     def plot_f(self, labels=True, cbar_font_size=16):
         """Plots the Adjacency matrix of the graph"""
-        plt.matshow(self.F, cmap='Blues')
+        plt.matshow(self.mat_f, cmap='Blues')
         cbar = plt.colorbar()
         cbar.ax.tick_params(labelsize=cbar_font_size)
         if labels:
@@ -345,15 +359,45 @@ class ConnectivityUnit:
             ax.xaxis.set_ticks_position('bottom')
         plt.show()
 
-    def clip_f(self, low=None, high=None, low_val=0, high_val=1):
+    def clip_f(self, low=None, high=None, low_val=0, high_val=1, inplace=True):
         """
-        In the connectivity matrix F, values lower than 'low' are assigned as 'low_val'
+        In the connectivity matrix mat_f, values lower than 'low' are assigned as 'low_val'
         and values higher than 'high' are assigned as 'high_val'
         """
+        mat_f = self.mat_f
         if low is not None:
-            self.F = np.where(self.F < low, low_val, self.F)
+            mat_f = np.where(self.mat_f < low, low_val, self.mat_f)
         if high is not None:
-            self.F = np.where(self.F > high, high_val, self.F)
+            mat_f = np.where(self.mat_f > high, high_val, self.mat_f)
+        if inplace:
+            self.mat_f = mat_f
+        else:
+            return self.mat_f.copy()
+
+    # TODO: More on risk estimation side...
+    def update_new_tick(self, df_conn, measurement=None, mat_h=None, mat_r=None, relief_factor=0.6, **kwargs):
+        """
+        Update the risk estimates according to previous estimate
+
+        :param df_conn: Canonical connection data DataFrame
+        :param measurement: Risk measurements array
+        :param mat_h: Observation matrix
+        :param mat_r: Measurement noise covariance matrix
+        :param relief_factor: Percentage of the risk relieved at each time step for each node
+            See the paper for more.
+        :param kwargs: self.read_flows kwargs
+        :return: None
+        """
+
+        df = preprocess_df(df_conn, date_col=' Timestamp')
+        self.read_flows(df, entity_names=self.names, window_type='time', **kwargs)
+        self.fit_connectivity_model(method='cov', verbose=True)
+
+        self.mat_x, self.mat_p = single_risk_update(self.mat_f, measurement=measurement, mat_h=mat_h,
+                                                    mat_x_init=self.mat_x, mat_p_init=self.mat_p, mat_q=self.mat_q,
+                                                    mat_r=mat_r, k_steps=1, relief_factor=relief_factor,
+                                                    normalize=False)
+        self.mat_r = mat_r
 
 
 def get_all_entities(df, src_id_col=' Source IP', dst_id_col=' Destination IP'):
