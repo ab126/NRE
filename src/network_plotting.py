@@ -815,7 +815,7 @@ def pos2json(filename, **kwargs):
         json.dump(json_dict, outfile)
 
 
-def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4,
+def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4, alpha=20,
                plot_bool=True):
     """Computes the "Pie Layout" for the network given by mat_f"""
 
@@ -834,7 +834,7 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
         gs = gr.subgraph(np.array(gr.nodes)[ind])
         theta_i = phi * (i - 1)
 
-        pos = nx.spring_layout(gs, seed=43)
+        pos = risk_elevation_layout(gs, alpha=alpha, seed=43)
         if risk_mean is None:
             pos = normalize_coordinates(pos, diam_xy=d_xy, diam_z=d_z)
         else:

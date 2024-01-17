@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import vertexShader from './shaders/vertex.glsl.js'
 import fragmentShader from './shaders/fragment.glsl.js'
 
-import * as data from './saves/net_data_453.json' assert {type: 'json'}; // 63
+import * as data from './saves/net_data_medium.json' assert {type: 'json'}; // 63
 
 console.log(data)
 
