@@ -1,6 +1,5 @@
 from src.preprocess import preprocess_df
-from src.network_connectivity import ConnectivityUnit
-from src.kalman_network_tools import single_risk_update
+from src.network_connectivity import ConnectivityUnit, single_risk_update
 
 
 # TODO: This class should deal with the whole network. Add detailed docs (?)

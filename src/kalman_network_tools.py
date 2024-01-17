@@ -9,7 +9,7 @@ from PIL import Image
 from filterpy.kalman import KalmanFilter
 from matplotlib import pyplot as plt
 
-from .network_connectivity import MIN_SAMPLES, ConnectivityUnit, get_all_entities
+from .network_connectivity import MIN_SAMPLES, ConnectivityUnit, get_all_entities, single_risk_update
 from .time_windowed import get_window
 
 
@@ -74,80 +74,6 @@ def graph_evol(all_graphs, forget_factor):
 
 
 # TODO: Simplifies related functions with single_step_update below, add docstring
-def single_risk_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat_p_init=None, mat_q=None, mat_r=None,
-                       k_steps=1, relief_factor=0.6, normalize=False):
-    """
-    Given the functional connectivity graph mat_f, measurements and previous risk estimates, computes the current risk
-    estimates
-
-    :param mat_f: Network state graph.
-    2D array of size [n_nodes, n_nodes]
-    :param measurement: Measurement z for each the calculated graph
-    1D array of size [n_z]
-    :param mat_h: Observation matrix that indicates the measured entity
-    2D array of size [n_z, n_nodes]
-    :param mat_x_init: Initial risk estimate
-    1D array of size [n_nodes]
-    :param mat_p_init: Initial risk estimate error covariance matrix
-    2D array of size [n_nodes, n_nodes]
-    :param mat_q: System noise covariance matrix
-    2D array of size [n_nodes, n_nodes]
-    :param mat_r: Measurement noise covariance matrix
-    2D array of size [n_z, n_z]
-    :param k_steps: Number of Kalman Filter Steps to be used in calculating risk estimates.
-    See the paper for more.
-    :param relief_factor: Percentage of the risk relieved at each time step for each node
-    See the paper for more.
-    :param normalize: If True, normalizes risks at each step
-
-    :return mat_x_kf, mat_p_kf:
-        mat_x_kf: Calculated Risk Estimates mean
-        mat_p_kf: Calculated Risk Estimates error covariance matrix
-    """
-
-    assert mat_f.shape[-1] == mat_f.shape[-2], 'Graph matrix is not square'
-    n_nodes = mat_f.shape[-1]
-    n_z = len(measurement) if measurement is not None else 1
-    if measurement is not None or mat_h is not None:
-        assert len(measurement) == mat_h.shape[0], 'Measurement dimensions mismatch'
-
-    # Initializations
-    if mat_x_init is None or mat_p_init is None:
-        mat_x_init = np.ones((n_nodes, 1))
-        mat_x_init = mat_x_init / np.linalg.norm(mat_x_init)
-        mat_p_init = np.eye(n_nodes) / 10 ** 1  # -1
-    if mat_q is None:
-        mat_q = np.eye(n_nodes, n_nodes) / 10 ** 3
-    if mat_r is None:
-        mat_r = np.eye(n_z, n_z) / 10 ** 2
-
-    mat_x_kf = mat_x_init.copy()
-    mat_p_kf = mat_p_init.copy()
-
-    # Kalman Filter
-    f = KalmanFilter(dim_x=n_nodes, dim_z=n_z)
-    for k in range(k_steps):
-        f.x = mat_x_kf
-        f.F = mat_f
-        f.P = mat_p_kf
-        f.Q = mat_q
-
-        f.predict()
-        if n_z > 0:
-            z = measurement
-            f.H = mat_h
-            f.R = mat_r
-            f.update(z)
-
-        mat_x_kf = f.x.copy() * (1 - relief_factor)
-        mat_p_kf = f.P.copy() * (1 - relief_factor) ** 2
-
-        # Normalization
-        if normalize:
-            c = np.linalg.norm(mat_x_kf)
-            mat_x_kf = mat_x_kf / c
-            mat_p_kf = mat_p_kf / (c ** 2)
-    return mat_x_kf, mat_p_kf
 
 
 def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, mat_x_init=None, mat_p_init=None,
