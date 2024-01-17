@@ -5,7 +5,7 @@ import pandas as pd
 
 from src.kalman_network_tools import graphs_2_risk_scores
 from src.network_connectivity import ConnectivityUnit
-from src.network_plotting import risks_over_time_3d
+from src.signal_plotting import risks_over_time_3d
 from src.preprocess import preprocess_df
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Monday-WorkingHours.pcap_ISCX.csv'
