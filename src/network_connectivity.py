@@ -1,9 +1,11 @@
-import matplotlib
+import copy
+
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+from filterpy.kalman import KalmanFilter
 
-from .kalman_network_tools import single_risk_update
+from .network_partitioning import apply_spec_clus
 from .npeet import npeet_entropy_estimators as ee
 from ordered_set import OrderedSet
 
@@ -38,7 +40,7 @@ cic_conn_param_specs = {
 }
 
 
-# TODO: Move estimate risks to here
+# TODO: Implement Inheritance
 class ConnectivityUnit:
     """
     Base unit for analyzing entity connectivity/relationships in subnetworks.
@@ -172,6 +174,23 @@ class ConnectivityUnit:
         self.samples = np.array(samples, dtype='float')
         self.names = sub_net_names
         self.num_appearances = np.array(num_appearances, dtype='float')
+
+    def remove_entities(self, remove_names):
+        """ Removes the names in remove_names from the connectivity unit"""
+        old_names = np.array(self.names)
+        ind = np.isin(old_names, remove_names, invert=True)
+
+        self.names = list(old_names[ind])
+        self.samples = self.samples[:, ind].copy()
+        self.num_appearances = self.num_appearances[ind].copy()
+        if self.mat_f.size != 0:
+            self.mat_f = self.mat_f[np.ix_(ind, ind)].copy()
+        if self.mat_r.size != 0:
+            self.mat_r = self.mat_r[np.ix_(ind, ind)].copy()
+        if self.mat_x.size != 0:
+            self.mat_x = self.mat_x[ind].copy()
+        if self.mat_p.size != 0:
+            self.mat_p = self.mat_p[np.ix_(ind, ind)].copy()
 
     def apply_dft_mag(self):
         """Applies magnitude of fft to samples on nodes"""
@@ -363,34 +382,19 @@ class ConnectivityUnit:
     def remove_infrequent(self, thr=1000):
         """ Removes the entities with occurrence less than a threshold in the connection data"""
 
-        new_names = []
+        remove_names = []
         for name, occurrence in zip(self.names, self.num_appearances):
-            if occurrence >= thr:
-                new_names.append(name)
+            if occurrence < thr:
+                remove_names.append(name)
 
-        old_names = np.array(self.names)
-        new_names = np.array(new_names)
-        ind = np.isin(old_names, new_names)
-
-        self.names = list(old_names[ind])
-        self.samples = self.samples[:, ind].copy()
-        self.num_appearances = self.num_appearances[ind].copy()
-        self.mat_f = self.mat_f[np.ix_(ind, ind)].copy()
-        self.mat_r = self.mat_r[np.ix_(ind, ind)].copy()
-        self.mat_x = self.mat_x[ind].copy()
-        self.mat_p = self.mat_p[np.ix_(ind, ind)].copy()
-        # TODO: Test this
-
-    def apply_partitioning(self):
-        """ Partitions the network with spectral partitioning algorithm"""
-        pass
+        self.remove_entities(remove_names)
 
     def clip_f(self, low=None, high=None, low_val=0, high_val=1, inplace=True):
         """
         In the connectivity matrix mat_f, values lower than 'low' are assigned as 'low_val'
         and values higher than 'high' are assigned as 'high_val'
         """
-        mat_f = self.mat_f
+        mat_f = self.mat_f.copy()
         if low is not None:
             mat_f = np.where(self.mat_f < low, low_val, self.mat_f)
         if high is not None:
@@ -398,7 +402,25 @@ class ConnectivityUnit:
         if inplace:
             self.mat_f = mat_f
         else:
-            return self.mat_f.copy()
+            return mat_f
+
+    def suppress_f(self, degree=2, inplace=True):
+        """ Suppresses the amount an entity influences other entities. The maximal influence (edge weight) stays same,
+        but other edges diminish according to the degree of the power"""
+
+        def non_lin_func(x):
+            return (1 - np.cos(np.pi * x)) / 2
+
+        assert type(degree) == int, "Degree has to be int"
+        mat_f = self.mat_f.copy()
+
+        for _ in range(degree):
+            mat_f = non_lin_func(mat_f)
+
+        if inplace:
+            self.mat_f = mat_f
+        else:
+            return mat_f
 
     # Risk Estimation related Methods
     # TODO: More on risk estimation side...
@@ -554,3 +576,98 @@ def get_mat_f_q_from_covariance(cov):
 def _sigmoid(x):
     """Sigmoid function"""
     return 1 / (1 + np.exp(-x))
+
+
+def single_risk_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat_p_init=None, mat_q=None, mat_r=None,
+                       k_steps=1, relief_factor=0.6, normalize=False):
+    """
+    Given the functional connectivity graph mat_f, measurements and previous risk estimates, computes the current risk
+    estimates
+
+    :param mat_f: Network state graph.
+    2D array of size [n_nodes, n_nodes]
+    :param measurement: Measurement z for each the calculated graph
+    1D array of size [n_z]
+    :param mat_h: Observation matrix that indicates the measured entity
+    2D array of size [n_z, n_nodes]
+    :param mat_x_init: Initial risk estimate
+    1D array of size [n_nodes]
+    :param mat_p_init: Initial risk estimate error covariance matrix
+    2D array of size [n_nodes, n_nodes]
+    :param mat_q: System noise covariance matrix
+    2D array of size [n_nodes, n_nodes]
+    :param mat_r: Measurement noise covariance matrix
+    2D array of size [n_z, n_z]
+    :param k_steps: Number of Kalman Filter Steps to be used in calculating risk estimates.
+    See the paper for more.
+    :param relief_factor: Percentage of the risk relieved at each time step for each node
+    See the paper for more.
+    :param normalize: If True, normalizes risks at each step
+
+    :return mat_x_kf, mat_p_kf:
+        mat_x_kf: Calculated Risk Estimates mean
+        mat_p_kf: Calculated Risk Estimates error covariance matrix
+    """
+
+    assert mat_f.shape[-1] == mat_f.shape[-2], 'Graph matrix is not square'
+    n_nodes = mat_f.shape[-1]
+    n_z = len(measurement) if measurement is not None else 1
+    if measurement is not None or mat_h is not None:
+        assert len(measurement) == mat_h.shape[0], 'Measurement dimensions mismatch'
+
+    # Initializations
+    if mat_x_init is None or mat_p_init is None:
+        mat_x_init = np.ones((n_nodes, 1))
+        mat_x_init = mat_x_init / np.linalg.norm(mat_x_init)
+        mat_p_init = np.eye(n_nodes) / 10 ** 1  # -1
+    if mat_q is None:
+        mat_q = np.eye(n_nodes, n_nodes) / 10 ** 3
+    if mat_r is None:
+        mat_r = np.eye(n_z, n_z) / 10 ** 2
+
+    mat_x_kf = mat_x_init.copy()
+    mat_p_kf = mat_p_init.copy()
+
+    # Kalman Filter
+    f = KalmanFilter(dim_x=n_nodes, dim_z=n_z)
+    for k in range(k_steps):
+        f.x = mat_x_kf
+        f.F = mat_f
+        f.P = mat_p_kf
+        f.Q = mat_q
+
+        f.predict()
+        if n_z > 0:
+            z = measurement
+            f.H = mat_h
+            f.R = mat_r
+            f.update(z)
+
+        mat_x_kf = f.x.copy() * (1 - relief_factor)
+        mat_p_kf = f.P.copy() * (1 - relief_factor) ** 2
+
+        # Normalization
+        if normalize:
+            c = np.linalg.norm(mat_x_kf)
+            mat_x_kf = mat_x_kf / c
+            mat_p_kf = mat_p_kf / (c ** 2)
+    return mat_x_kf, mat_p_kf
+
+
+def apply_partitioning(cu, n_clus, plot_bool=True, fontsize=24, seed=5):
+    """ Partitions the network with spectral partitioning algorithm. Reorders the nodes and returns ConnectivityUnits
+    representing each subnetwork."""
+    gr, new_labels, clusters = apply_spec_clus(cu.mat_f, cu.names, n_clus, fontsize=fontsize, plot_bool=plot_bool,
+                                               seed=seed)
+
+    sub_units = []
+    for i in clusters:
+        curr_unit = copy.deepcopy(cu)
+        curr_names = np.array(gr.nodes)[new_labels == i]
+
+        remove_names = [name for name in cu.names if name not in curr_names]
+        curr_unit.remove_entities(remove_names)
+        sub_units.append(copy.deepcopy(curr_unit))
+    return sub_units
+
+
