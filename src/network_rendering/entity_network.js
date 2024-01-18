@@ -164,7 +164,7 @@ function init(){
     //scene.add( helper );
 
     // Pie Outline
-    const pieOutline = makeOutliine(scene)
+    const pieOutline = makeOutline(scene)
     console.log(pieOutline)
 
     // Renderer
@@ -343,7 +343,7 @@ function makeAllEdges(elavate) {
     }
 }
 
-function makeOutliine( scene ) {
+function makeOutline( scene ) {
     const pieOutline = new THREE.Group();
     scene.add(pieOutline);
 
@@ -359,7 +359,7 @@ function makeOutliine( scene ) {
     let points = outerCircle.getPoints( 1000 );
     let pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
     const outerLine = new THREE.Line( pieGeometry, outlineMaterial );
-    pieOutline.add(outerLine);
+    //pieOutline.add(outerLine);
 
     const innerCircle = new THREE.EllipseCurve(
         0,  0,            // ax, aY
@@ -390,7 +390,7 @@ function makeOutliine( scene ) {
 
         const geometry = new THREE.BufferGeometry().setFromPoints( points );
         const line = new THREE.Line( geometry, outlineMaterial );
-        pieOutline.add(line);
+        //pieOutline.add(line);
     }
     return pieOutline
 }

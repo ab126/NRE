@@ -267,8 +267,8 @@ def pos2json(filename, **kwargs):
         json.dump(json_dict, outfile)
 
 
-def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4, alpha=20,
-               plot_bool=True):
+def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4, alpha=2,
+               iterations=50, plot_bool=True, with_labels=False, idle=False):
     """Computes the "Pie Layout" for the network given by mat_f"""
 
     gr, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
@@ -286,7 +286,11 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
         gs = gr.subgraph(np.array(gr.nodes)[ind])
         theta_i = phi * (i - 1)
 
-        pos = risk_elevation_layout(gs, alpha=alpha, seed=43)
+        if idle:
+            pos = nx.spring_layout(gs, seed=43)
+        else:
+            pos = risk_elevation_layout(gs, alpha=alpha, seed=43, iterations=iterations)
+
         if risk_mean is None:
             pos = normalize_coordinates(pos, diam_xy=d_xy, diam_z=d_z)
         else:
@@ -306,7 +310,7 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
     if plot_bool:
         fig, ax = plt.subplots(figsize=(10, 6))
         widths = [gt[u][v]['weight'] for u, v in gt.edges]
-        nx.draw(gt, pos_pie, with_labels=True, width=widths, ax=ax, node_color=node_colors)
+        nx.draw(gt, pos_pie, with_labels=with_labels, width=widths, ax=ax, node_color=node_colors)
     if risk_mean is None:
         return pos_pie, node_colors, r, gt
     else:
@@ -345,7 +349,7 @@ def risk_elevation_layout(
         k=None,
         pos=None,
         fixed=None,
-        iterations=500,
+        iterations=50,
         threshold=1e-4,
         weight="weight",
         scale=1,
