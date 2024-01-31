@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import vertexShader from './shaders/vertex.glsl.js'
 import fragmentShader from './shaders/fragment.glsl.js'
 
-import * as data from './saves/net_data_medium2.json' assert {type: 'json'}; // 63
+import * as data from './saves/net_data_medium.json' assert {type: 'json'}; // 63
 
 console.log(data)
 
@@ -22,7 +22,8 @@ const effectController = {
     solidEntities: true,
     showConnectivity: false,
     elevateWithRisks: false,
-    colorWithRisks: false
+    colorWithRisks: false,
+    edgesOn: true
 };
 
 // Read planar positions
@@ -125,6 +126,13 @@ function initGUI(){
         
             }
         }
+    } );
+
+    gui.add( effectController, 'edgesOn' ).onChange( function ( value ) {
+
+        edgeTopology.visible = !effectController.showConnectivity && value ;
+        edgeConnectivity.visible = effectController.showConnectivity && value;
+
     } );
 }
 
@@ -359,7 +367,7 @@ function makeOutline( scene ) {
     let points = outerCircle.getPoints( 1000 );
     let pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
     const outerLine = new THREE.Line( pieGeometry, outlineMaterial );
-    //pieOutline.add(outerLine);
+    pieOutline.add(outerLine);
 
     const innerCircle = new THREE.EllipseCurve(
         0,  0,            // ax, aY
@@ -390,7 +398,7 @@ function makeOutline( scene ) {
 
         const geometry = new THREE.BufferGeometry().setFromPoints( points );
         const line = new THREE.Line( geometry, outlineMaterial );
-        //pieOutline.add(line);
+        pieOutline.add(line);
     }
     return pieOutline
 }
