@@ -471,7 +471,7 @@ def risk_elevation_layout(
 
     try:
         # Sparse matrix
-        if len(g) < 500:  # sparse solver for large graphs
+        if len(g) < 1000:  # sparse solver for large graphs
             raise ValueError
         A = nx.to_scipy_sparse_array(g, weight=weight, dtype="f")
         if k is None and fixed is not None:
@@ -585,3 +585,4 @@ def get_layout_tree(g_connectivity, pos):
                 continue
             g_layout.add_edge(u, v, weight=np.linalg.norm(pos[u] - pos[v]))
     return nx.minimum_spanning_tree(g_layout)
+

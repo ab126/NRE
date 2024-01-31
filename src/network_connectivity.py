@@ -654,6 +654,7 @@ def single_risk_update(mat_f, measurement=None, mat_h=None, mat_x_init=None, mat
     return mat_x_kf, mat_p_kf
 
 
+# TODO: Optimize below functions for large networks
 def apply_partitioning(cu, n_clus, plot_bool=True, fontsize=24, seed=5):
     """ Partitions the network with spectral partitioning algorithm. Reorders the nodes and returns ConnectivityUnits
     representing each subnetwork."""
@@ -671,3 +672,19 @@ def apply_partitioning(cu, n_clus, plot_bool=True, fontsize=24, seed=5):
     return sub_units
 
 
+def get_connected_components(cu_main):
+    """ Returns the Connectivity units for the connected components of the main_unit. Return from largest to smallest"""
+    g_f = nx.from_numpy_array(cu_main.mat_f - np.diag(np.diag(cu_main.mat_f)))
+    nx.relabel_nodes(g_f, {i: name for i, name in enumerate(cu_main.names)}, copy=False)
+
+    gcc = sorted(nx.connected_components(g_f), key=len, reverse=True) # connected components
+
+    sub_units = []
+    for nodes_set in gcc:
+        curr_names = list(nodes_set)
+
+        curr_unit = copy.deepcopy(cu_main)
+        remove_names = [name for name in cu_main.names if name not in curr_names]
+        curr_unit.remove_entities(remove_names)
+        sub_units.append(copy.deepcopy(curr_unit))
+    return sub_units
