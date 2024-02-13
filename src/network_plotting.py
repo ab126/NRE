@@ -267,6 +267,7 @@ def pos2json(filename, **kwargs):
         json.dump(json_dict, outfile)
 
 
+# TODO: Add method parameter
 def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_xy=1.5, d_z=2, r_const=4, alpha=2,
                iterations=50, plot_bool=True, with_labels=False, idle=False):
     """Computes the "Pie Layout" for the network given by mat_f"""
@@ -356,6 +357,8 @@ def risk_elevation_layout(
         center=None,
         dim=2,
         seed=None,
+        method=None,
+        beta=1
 ):
     """Position nodes using Fruchterman-Reingold force-directed algorithm with
      elevation according to risks.
@@ -433,6 +436,16 @@ def risk_elevation_layout(
         if None, the random number generator is the RandomState instance used
         by numpy.random.
 
+    method : str
+        Force-directed algorithm to use. Default is fruchterman-reingold with risk term
+
+        'davids': Neighbors attract each other with spring force, non-neighbors repel each other with columb force
+         times shortest path distance
+
+    beta: float
+        Additional constant for some methods
+        method = 'davids': Ratio of coulomb like force and spring force constants
+
     Returns
     -------
     pos : dict
@@ -473,10 +486,10 @@ def risk_elevation_layout(
         # Sparse matrix
         if len(g) < 1000:  # sparse solver for large graphs
             raise ValueError
-        A = nx.to_scipy_sparse_array(g, weight=weight, dtype="f")
+        mat_a = nx.to_scipy_sparse_array(g, weight=weight, dtype="f")
         if k is None and fixed is not None:
             # We must adjust k by domain size for layouts not near 1x1
-            nnodes, _ = A.shape
+            nnodes, _ = mat_a.shape
             k = dom_size / np.sqrt(nnodes)
         raise NotImplementedError("Modified Fruchterman Reingold not implemented for sparse matrices")
 
@@ -485,15 +498,30 @@ def risk_elevation_layout(
         # )
 
     except ValueError:
-        A = nx.to_numpy_array(g, weight=weight)
+        mat_a = nx.to_numpy_array(g, weight=weight)
         if k is None and fixed is not None:
             # We must adjust k by domain size for layouts not near 1x1
-            nnodes, _ = A.shape
+            nnodes, _ = mat_a.shape
             k = dom_size / np.sqrt(nnodes)
-        pos = _modified_fruchterman_reingold(
-            A, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations, threshold=threshold,
-            dim=dim, seed=seed
-        )
+
+        if method == 'davids':
+            dists = list(nx.shortest_path_length(g))
+            mat_d = np.zeros(mat_a.shape)
+            nnodes = mat_a.shape[0]
+            for i in range(nnodes):
+                for j in range(nnodes):
+                    assert dists[i][0] == list(g.nodes)[i], "Order of nodes due to nx.shortest_path_length is altered"
+                    mat_d[i, j] = dists[i][1][list(g.nodes)[j]]
+
+            pos = _david_force_directed(
+                mat_a, mat_d, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations, threshold=threshold,
+                dim=dim, seed=seed, beta=beta)
+        elif method == 'fuchterman-reingold' or method is None:  # None
+            pos = _modified_fruchterman_reingold(
+                mat_a, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations, threshold=threshold,
+                dim=dim, seed=seed)
+        else:
+            raise NotImplementedError("Method {} not implemented".format(method))
     if fixed is None and scale is not None:
         pos = rescale_layout(pos, scale=scale) + center
     pos = dict(zip(g, pos))
@@ -556,6 +584,79 @@ def _modified_fruchterman_reingold(
         displacement = np.einsum(
             "ijk,ij->ik", delta, (k * k / distance ** 2 - mat_a * distance / k)  # Standard Fruchterman-Reingold
         )
+        displacement[:, 1] += alpha * risks  # Modification due to risk elevation
+
+        # update positions
+        length = np.linalg.norm(displacement, axis=-1)
+        length = np.where(length < 0.01, 0.1, length)  # Clip length
+        delta_pos = np.einsum("ij,i->ij", displacement, t / length)  # Scale
+        if fixed is not None:
+            # don't change positions of fixed nodes
+            delta_pos[fixed] = 0.0
+        pos += delta_pos
+        # cool temperature
+        t -= dt
+        if (np.linalg.norm(delta_pos) / nnodes) < threshold:
+            break
+    return pos
+
+
+def _david_force_directed(
+        mat_a, mat_d, risks=None, alpha=0.2, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, dim=2, seed=None,
+        beta=1):
+    # Position nodes in adjacency matrix A using a force directed algorithm
+
+    np.random.seed(seed)
+
+    if dim != 2:
+        raise NotImplementedError("Only implemented for dim=2")
+
+    try:
+        nnodes, _ = mat_a.shape
+    except AttributeError as err:
+        msg = "fruchterman_reingold() takes an adjacency matrix as input"
+        raise nx.NetworkXError(msg) from err
+
+    if risks is None:
+        risks = np.zeros(nnodes)
+    else:
+        risks -= np.mean(risks)
+        risks /= np.linalg.norm(risks) if np.linalg.norm(risks) != 0 else np.zeros(nnodes)
+
+    if pos is None:
+        # random initial positions
+        pos = np.asarray(np.random.rand(nnodes, dim), dtype=mat_a.dtype)
+    else:
+        # make sure positions are of same type as matrix
+        pos = pos.astype(mat_a.dtype)
+
+    # optimal distance between nodes
+    if k is None:
+        k = np.sqrt(1.0 / nnodes)
+    # the initial "temperature"  is about .1 of domain area (=1x1)
+    # this is the largest step allowed in the dynamics.
+    # We need to calculate this in case our fixed positions force our domain
+    # to be much bigger than 1x1
+    t = max(max(pos.T[0]) - min(pos.T[0]), max(pos.T[1]) - min(pos.T[1])) * 0.1
+    # simple cooling scheme.
+    # linearly step down by dt on each iteration so last iteration is size dt.
+    dt = t / (iterations + 1)
+    delta = np.zeros((pos.shape[0], pos.shape[0], pos.shape[1]), dtype=mat_a.dtype)
+    # the inscrutable (but fast) version
+    # this is still O(V^2)
+    # could use multilevel methods to speed this up significantly
+    for iteration in range(iterations):
+        # matrix of difference between points
+        delta = pos[:, np.newaxis, :] - pos[np.newaxis, :, :]
+        # distance between points
+        distance = np.linalg.norm(delta, axis=-1)
+        # enforce minimum distance of 0.01
+        np.clip(distance, 0.01, None, out=distance)
+        # displacement "force"
+        displacement = np.einsum(
+            "ijk,ij->ik", delta, (beta * mat_d * (k/ distance) - mat_a * distance / k)
+            #"ijk,ij->ik", delta, (beta * mat_d * (k ** 2) / distance ** 2 - mat_a * distance / k)
+        )  # TODO: Seems like its force times distance of each other node
         displacement[:, 1] += alpha * risks  # Modification due to risk elevation
 
         # update positions
