@@ -12,44 +12,39 @@ import {singleStepForceDirected} from './force-directed.js'
 
 console.log(data)
 
-let camera, scene, renderer, controls;
+let camera, scene, renderer;
 let entityGroup;
-let nodePointGeometry, nodeColors, nodePositions, nodePointCloud;
-let edgeGeometry, edgeTopologyPositions, edgeTopology;
-let edgeConnectivity, edgeColors, edgeConnectivityPositions;
+let nodeColors, nodePosArray;
+let edgeConnectivity, edgeColors, edgePos;
 const radius = 0.05;
-const dz = 0.01
 
 const effectController = {
-    solidEntities: true,
     showConnectivity: true,
     elevateWithRisks: false,
     colorWithRisks: false,
-    edgesOn: true
+    maxIter: 50,
+    activateForce: false
 };
 
 // Read planar positions
 const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
 const nNodes = Object.keys(pos).length;
-const nEdges = Object.keys(topologyEdges).length;
+
+let nodePos = Array.from(Object.keys(pos), (key) => pos[key]);
+let stepSize = 1;
+let dt = stepSize / (effectController.maxIter + 1);
+
+const nFrame = 30;
+let counter = 0;
 
 init();
 animate();
-moveNodes();
 
 function initGUI(){
     const gui = new GUI();
 
-    gui.add( effectController, 'solidEntities' ).onChange( function ( value ) {
-
-        entityGroup.visible = value;
-        nodePointCloud.visible = !value
-
-    } );
-
     gui.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
 
-        edgeTopology.visible = !value;
         edgeConnectivity.visible = value
 
     } );
@@ -57,25 +52,8 @@ function initGUI(){
     //Maybe better to update whats changed?
     gui.add( effectController, 'elevateWithRisks' ).onChange( function ( elavate ) {
         
-        //Update nodePositions
-        for ( let i = 0; i < nNodes; i ++ ) {
-            let name = Object.keys(pos)[i]
-    
-            nodePositions[ 3 * i + 2 ] = elavate ? risk_mean[name]: 0;
-
-        }
 
         //Update edgePositions
-        let src, dst;
-        for (let i = 0; i < nEdges; i++) {
-
-            [src, dst] = topologyEdges[i];
-
-            edgeTopologyPositions[ 6 * i + 2] = elavate ? risk_mean[src] : 0;
-
-            edgeTopologyPositions[ 6 * i + 5] = elavate ? risk_mean[dst] : 0;
-        }
-
         for (let i = 0; i < nNodes ; i++) {
 
             for (let j = 0; j < nNodes ; j++) {
@@ -87,23 +65,22 @@ function initGUI(){
                 let src = Object.keys(pos)[i];
                 let dst = Object.keys(pos)[j];
     
-                edgeConnectivityPositions[ 6 * k + 2] = elavate ? risk_mean[src] : 0;
+                edgePos[ 6 * k + 2] = elavate ? risk_mean[src] : 0;
     
-                edgeConnectivityPositions[ 6 * k + 5]  = elavate ? risk_mean[dst] : 0;
+                edgePos[ 6 * k + 5]  = elavate ? risk_mean[dst] : 0;
 
             }
         }
 
         // TODO: Need not update node positions additionally
         for ( let i = 0; i < nNodes; i ++ ) {
-            
+            let name = Object.keys(pos)[i];
             let dodec = entityGroup.children[i];
 
-            dodec.position.set(nodePositions[ 3 * i ], nodePositions[ 3 * i + 1 ], nodePositions[ 3 * i + 2])
+            dodec.position.set(nodePosArray[i][0], nodePosArray[i][1], elavate ? risk_mean[name]: 0)
             
         }
 
-        edgeTopology.geometry.attributes.position.needsUpdate = true;
         edgeConnectivity.geometry.attributes.position.needsUpdate = true;
         
         /*
@@ -133,12 +110,11 @@ function initGUI(){
         }
     } );
 
-    gui.add( effectController, 'edgesOn' ).onChange( function ( value ) {
-
-        edgeTopology.visible = !effectController.showConnectivity && value ;
-        edgeConnectivity.visible = effectController.showConnectivity && value;
-
+    gui.add( effectController, 'maxIter', 10, 100, 10).onChange( function ( value ){
+        dt = stepSize / (value + 1);
     } );
+
+    gui.add( effectController, 'activateForce' );
 }
 
 function init(){ 
@@ -162,7 +138,7 @@ function init(){
     scene.add( plane );
 
     // Pie Outline
-    const pieOutline = makeOutline(scene);
+    //const pieOutline = makeOutline(scene);
 
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -176,16 +152,14 @@ function init(){
     entityGroup = new THREE.Group(); // Entity nodes and edges
     scene.add( entityGroup );
     
-    nodePositions = new Float32Array( nNodes * 3 );
     nodeColors = new Float32Array( nNodes * 4 );
+    nodePosArray = Array(nNodes);
     
 
     for ( let i = 0; i < nNodes; i ++ ) {
         let name = Object.keys(pos)[i]
 
-        nodePositions[ i * 3 ] = pos[name][0];
-        nodePositions[ i * 3 + 1 ] = pos[name][1];
-        nodePositions[ i * 3 + 2 ] = 0;
+        nodePosArray[i] = pos[name];
 
         nodeColors[ i * 4 ] = entityColors[name][0];
         nodeColors[ i * 4 + 1] = entityColors[name][1];
@@ -195,39 +169,24 @@ function init(){
     }
     
     
-    
     for ( let i = 0; i < nNodes; i ++ ) {
         const geometryDodec = new THREE.DodecahedronGeometry( radius );
         const nodeMaterial = new THREE.MeshStandardMaterial( {color: 0x0a0859} );
 
         const dodec = new THREE.Mesh( geometryDodec, nodeMaterial );
 
-        dodec.position.set(nodePositions[ 3 * i ], nodePositions[ 3 * i + 1 ], nodePositions[ 3 * i + 2]);
+        dodec.position.set(nodePosArray[i][0], nodePosArray[i][1], 0);
         dodec.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entityGroup.add( dodec );
     }
 
     // Edges
 
-    makeEdgePositions(topologyEdges, false);
-    
-    // Network Topology
-    const edgeTopologyGeometry = new THREE.BufferGeometry()
-    edgeTopologyGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgeTopologyPositions, 3 ) );
-    
-    const edgeTopologyMaterial = new THREE.LineBasicMaterial({
-        color: 0xb08102
-    });
-    
-    edgeTopology = new THREE.LineSegments( edgeTopologyGeometry, edgeTopologyMaterial );
-    scene.add( edgeTopology );
-    edgeTopology.visible = !effectController.showConnectivity;
-
     // Connectivity
-    makeAllEdges(false);
+    [edgePos, edgeColors] = makeAllEdges(pos, false);
 
     const edgeConnectivityGeometry = new THREE.BufferGeometry()
-    edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgeConnectivityPositions, 3 ) );
+    edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
     
     const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
@@ -245,27 +204,69 @@ function init(){
     
 }
 
-function moveNodes(tot_iter=5){
-
-    let nodePos = Array.from(Object.keys(pos), (key) => pos[key]) 
+function moveNodes(nodePos, stepSize=null){
     
-    nodePos = tf.tidy( () =>  singleStepForceDirected(funcEdges, nodePos));
+    const nodePosArray2d = tf.tidy( () =>  singleStepForceDirected(funcEdges, nodePos, stepSize));
     // Cooling and convergence criteria right here
 
-    // TODO: Update the reference to node object as nodePos
+    edgePos = nodePos2edgePos(nodePosArray2d);
+    edgeConnectivity.geometry.attributes.position.needsUpdate = true;
+    //Topology edges?
 
-    console.log(nodePos);
-    console.log(tf.memory());
+    setNodePos(entityGroup, nodePosArray2d);
+    //console.log(tf.memory());
+
+    return nodePosArray2d;
+}
+
+// Sets the node positions according to the new node position array
+function setNodePos(nodeGroup, nodePos){
+    const nNodes = nodeGroup.children.length;
+    for ( let i = 0; i < nNodes; i ++ ) {
+
+        const dodec = nodeGroup.children[i];
+        dodec.position.set(nodePos[i][0], nodePos[i][1], 0);
+    }
+}
+
+// Returns edge position buffer from node position array
+function nodePos2edgePos(nodePosArr){
+    const nNodes = nodePosArr.length;
+    const edgePos = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
+
+    for (let i = 0; i < nNodes ; i++) {
+
+        for (let j = 0; j < nNodes ; j++) {
+
+            if (j == i){
+                continue;
+            }
+            let k = i * nNodes + j;
+
+            edgePos[ 6 * k ] = nodePosArr[i][0]; 
+            edgePos[ 6 * k + 1] = nodePosArr[i][1];
+            edgePos[ 6 * k + 2] = 0;
+
+            edgePos[ 6 * k + 3] = nodePosArr[j][0]; 
+            edgePos[ 6 * k + 4]  = nodePosArr[j][1];
+            edgePos[ 6 * k + 5]  = 0;
+
+        }
+    }
+    return edgePos;
 }
 
 /**
- * Makes edge defining points
- * @param {*} src Source entity
- * @param {*} dst Destination entity
+ * Makes edge defining points from edge topology object
+ * @param {*} edges Array whose entries are edges with ['source', 'destination']
+ * @param {*} pos Object whose fields are entity ids with [pos_x, pos_y] array describing 2D position
+ * @param {*} elavate If true, elavates the entities according the mean value of their risks in z direction
+ * @returns [edgeTopologyPositions]
+ *  edgeTopologyPositions: Float32Array of source position coordinates and destination  position coordinates
  */
-function makeEdgePositions(edges, elavate){
-    edgeTopologyPositions = new Float32Array( nEdges * 2 * 3 );
-    edgeColors = new Float32Array( nEdges * 2 * 3 );
+function makeEdgePositions(edges, pos, elavate){
+    const nEdges = Object.keys(edges).length;
+    const edgeTopologyPositions = new Float32Array( nEdges * 2 * 3 );
     let src, dst;
 
     for (let i = 0; i < edges.length; i++) {
@@ -275,25 +276,26 @@ function makeEdgePositions(edges, elavate){
         edgeTopologyPositions[ 6 * i ] = pos[src][0]; 
         edgeTopologyPositions[ 6 * i + 1] = pos[src][1];
         edgeTopologyPositions[ 6 * i + 2] = elavate ? risk_mean[src] : 0;
-
-        edgeColors[ 6 * i ] = Math.random() * 255; 
-        edgeColors[ 6 * i + 1] = 0;
-        edgeColors[ 6 * i + 2] = 0;
-
         edgeTopologyPositions[ 6 * i + 3] = pos[dst][0]; 
         edgeTopologyPositions[ 6 * i + 4] = pos[dst][1];
         edgeTopologyPositions[ 6 * i + 5] = elavate ? risk_mean[dst] : 0;
 
-        edgeColors[ 6 * i + 3] = edgeColors[ 6 * i ]; 
-        edgeColors[ 6 * i + 4] = 0;
-        edgeColors[ 6 * i + 5] = 0;
-
+        return [edgeTopologyPositions];
     }
 }
 
-function makeAllEdges(elavate) {
-    edgeConnectivityPositions = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
-    edgeColors = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
+/**
+ * Makes edge defining points from functional connectivity edge array
+ * @param {*} pos Object whose fields are entity ids with [pos_x, pos_y] array describing 2D position
+ * @param {*} elavate If true, elavates the entities according the mean value of their risks in z direction
+ * @returns [edgeConnectivityPositions, edgeColors]
+ *  edgeConnectivityPositions: Float32Array of source position coordinates and destination  position coordinates
+ *  edgeColors: Float32Array of RGBA values of edges
+ */
+function makeAllEdges(pos, elavate) {
+    const nNodes = Object.keys(pos).length;
+    const edgePositions = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
+    const edgeColors = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
 
     for (let i = 0; i < nNodes ; i++) {
 
@@ -306,18 +308,18 @@ function makeAllEdges(elavate) {
             let src = Object.keys(pos)[i];
             let dst = Object.keys(pos)[j];
 
-            edgeConnectivityPositions[ 6 * k ] = pos[src][0]; 
-            edgeConnectivityPositions[ 6 * k + 1] = pos[src][1];
-            edgeConnectivityPositions[ 6 * k + 2] = elavate ? risk_mean[src] : 0;
+            edgePositions[ 6 * k ] = pos[src][0]; 
+            edgePositions[ 6 * k + 1] = pos[src][1];
+            edgePositions[ 6 * k + 2] = elavate ? risk_mean[src] : 0;
 
             edgeColors[ 8 * k ] = (funcEdges[i][j])** (1/3) * 255 ; 
             edgeColors[ 8 * k + 1] = 0;
             edgeColors[ 8 * k + 2] = 0;
             edgeColors[ 8 * k + 3] = (funcEdges[i][j]) ** (3) * 255;
 
-            edgeConnectivityPositions[ 6 * k + 3] = pos[dst][0]; 
-            edgeConnectivityPositions[ 6 * k + 4]  = pos[dst][1];
-            edgeConnectivityPositions[ 6 * k + 5]  = elavate ? risk_mean[dst] : 0;
+            edgePositions[ 6 * k + 3] = pos[dst][0]; 
+            edgePositions[ 6 * k + 4]  = pos[dst][1];
+            edgePositions[ 6 * k + 5]  = elavate ? risk_mean[dst] : 0;
 
             edgeColors[ 8 * k + 4] = edgeColors[ 8 * k ]; 
             edgeColors[ 8 * k + 5] = edgeColors[ 8 * k + 1];
@@ -325,6 +327,7 @@ function makeAllEdges(elavate) {
             edgeColors[ 8 * k + 7] = edgeColors[ 8 * k + 3];
         }
     }
+    return [edgePositions, edgeColors];
 }
 
 
@@ -383,6 +386,16 @@ function makeOutline( scene ) {
 function animate() {
     
     const time = Date.now() * 0.001;
+
+    if (effectController.activateForce){
+        if ( counter % nFrame == 0) {
+            nodePos = moveNodes(nodePos, stepSize);
+            stepSize = (stepSize > dt) ? stepSize - dt : 0;
+            
+        }
+        counter += 1;
+    }
+    
 
 	renderer.render( scene, camera );
 

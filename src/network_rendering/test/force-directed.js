@@ -3,10 +3,10 @@ import * as tf from '@tensorflow/tfjs'
 
 
 /**
- * 
+ * Single Step Force Directed Method for entity layout
  * @param {*} funcAdj Array of functional connectivity graph adjacency matrix
  * @param {*} nodePos Node positions
- * @param {*} iter Iteration number from the start of the force directed method
+ * @param {*} t Temperature or the expected step size of displacement
  * @param {*} d_xy Diameter of the node distribution (max - min)
  * @param {*} minDist Minimum distance between entities
  * @param {*} alpha Coefficient of risk mean field
@@ -41,11 +41,11 @@ export function singleStepForceDirected(funcAdj, nodePos = null, t = null, d_xy 
 
     //Update
     let length = tf.norm(displacement, undefined, 1);
-    //length = length.clipByValue(0.1, length.max().arraySync());
-    const deltaPos = tf.einsum("ij,i->ij", displacement, tf.tensor([1]).div(length) ); // Scale the displacement
-    nodePosTensor.add(deltaPos);
+    length = length.clipByValue(0.01, length.max().arraySync());
+    const deltaPos = tf.einsum("ij,i->ij", displacement, tf.tensor([t]).div(length) ); // Scale the displacement
+    nodePosTensor = nodePosTensor.add(deltaPos);
 
-    console.log(tf.memory());
+    //console.log(tf.memory());
     const newNodePos = nodePosTensor.arraySync();
 
     return newNodePos;
