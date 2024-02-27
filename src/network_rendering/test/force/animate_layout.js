@@ -4,25 +4,28 @@ import * as tf from '@tensorflow/tfjs';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import vertexShader from '../shaders/vertex.glsl.js'
-import fragmentShader from '../shaders/fragment.glsl.js'
+import vertexShader from '../../shaders/vertex.glsl.js'
+import fragmentShader from '../../shaders/fragment.glsl.js'
 
-import * as data from '../saves/net_data_small.json' assert {type: 'json'}; // 63
-import {singleStepForceDirected} from './force-directed.js'
+import * as data from '../../saves/net_data_medium2.json' assert {type: 'json'}; // 63
+import {singleStepForceDirected, scaleToBounds} from './force-directed.js'
 
-console.log(data)
+console.log(data);
 
 let camera, scene, renderer;
 let entityGroup;
-let nodeColors, nodePosArray;
+let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
-const radius = 0.05;
+
+// Node parameters
+const baseSize = 0.03; //0.05
+const sizeMult = .07;
 
 const effectController = {
     showConnectivity: true,
-    elevateWithRisks: false,
-    colorWithRisks: false,
-    maxIter: 5000,
+    colorWithRisks: true,
+    maxIter: 50,
+    stepSize: .1,
     activateForce: false
 };
 
@@ -34,7 +37,7 @@ let nodePos = Array.from(Object.keys(pos), (key) => pos[key]);
 let stepSize = .01;
 let dt = stepSize / (effectController.maxIter + 1);
 
-const nFrame = 10;
+const nFrame = 2;
 let counter = 0;
 
 init();
@@ -47,46 +50,6 @@ function initGUI(){
 
         edgeConnectivity.visible = value
 
-    } );
-
-    //Maybe better to update whats changed?
-    gui.add( effectController, 'elevateWithRisks' ).onChange( function ( elavate ) {
-        
-
-        //Update edgePositions
-        for (let i = 0; i < nNodes ; i++) {
-
-            for (let j = 0; j < nNodes ; j++) {
-    
-                if (j == i){
-                    continue;
-                }
-                let k = i * nNodes + j;
-                let src = Object.keys(pos)[i];
-                let dst = Object.keys(pos)[j];
-    
-                edgePos[ 6 * k + 2] = elavate ? risk_mean[src] : 0;
-    
-                edgePos[ 6 * k + 5]  = elavate ? risk_mean[dst] : 0;
-
-            }
-        }
-
-        // TODO: Need not update node positions additionally
-        for ( let i = 0; i < nNodes; i ++ ) {
-            let name = Object.keys(pos)[i];
-            let dodec = entityGroup.children[i];
-
-            dodec.position.set(nodePosArray[i][0], nodePosArray[i][1], elavate ? risk_mean[name]: 0)
-            
-        }
-
-        edgeConnectivity.geometry.attributes.position.needsUpdate = true;
-        
-        /*
-        entityGroup.children.forEach(element => {
-            element.geometry.attributes.position.needsUpdate = true;
-        });*/
     } );
 
     gui.add( effectController, 'colorWithRisks' ).onChange( function ( value ) {
@@ -102,9 +65,9 @@ function initGUI(){
             }
         } else {
             for ( let i = 0; i < nNodes; i ++ ) {
-
+                let name = Object.keys(pos)[i];
                 let dodec = entityGroup.children[i];
-                dodec.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
+                dodec.material.color.setRGB(entityColors[name][0], entityColors[name][1], entityColors[name][2]);
         
             }
         }
@@ -112,6 +75,10 @@ function initGUI(){
 
     gui.add( effectController, 'maxIter', 10, 100, 10).onChange( function ( value ){
         dt = stepSize / (value + 1);
+    } );
+
+    gui.add( effectController, 'stepSize', .05, .5, .05).onChange( function ( value ){
+       stepSize=value;
     } );
 
     gui.add( effectController, 'activateForce' );
@@ -154,23 +121,29 @@ function init(){
     
     nodeColors = new Float32Array( nNodes * 4 );
     nodePosArray = Array(nNodes);
+    const degrees = Array(nNodes);
     
 
     for ( let i = 0; i < nNodes; i ++ ) {
-        let name = Object.keys(pos)[i]
+        let name = Object.keys(pos)[i];
 
         nodePosArray[i] = pos[name];
+        degrees[i] = funcEdges[i].reduce((acc, val) => acc + val );
 
-        nodeColors[ i * 4 ] = entityColors[name][0];
-        nodeColors[ i * 4 + 1] = entityColors[name][1];
-        nodeColors[ i * 4 + 2] = entityColors[name][2];
-        nodeColors[ i * 4 + 3] = entityColors[name][3];
+        nodeColors[ i * 4 ] = effectController.colorWithRisks ? risk_mean[name] / extras.diam_z : entityColors[name][0];
+        nodeColors[ i * 4 + 1] = effectController.colorWithRisks ? 0 : entityColors[name][1];
+        nodeColors[ i * 4 + 2] = effectController.colorWithRisks ? 0 : entityColors[name][2];
+        nodeColors[ i * 4 + 3] = effectController.colorWithRisks ? 1 : entityColors[name][3];
 
     }
+    const minDeg = Math.min(...degrees);
+    const maxDeg = Math.max(...degrees);
+    nodeSizes = Array(nNodes);
     
     
     for ( let i = 0; i < nNodes; i ++ ) {
-        const geometryDodec = new THREE.DodecahedronGeometry( radius );
+        nodeSizes[i] = baseSize + sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);
+        const geometryDodec = new THREE.DodecahedronGeometry( nodeSizes[i] );
         const nodeMaterial = new THREE.MeshStandardMaterial( {color: 0x0a0859} );
 
         const dodec = new THREE.Mesh( geometryDodec, nodeMaterial );
@@ -179,7 +152,7 @@ function init(){
         dodec.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entityGroup.add( dodec );
     }
-
+    //console.log(nodeSizes);
     // Edges
 
     // Connectivity
@@ -204,9 +177,11 @@ function init(){
     
 }
 
-function moveNodes(nodePos, stepSize=null){
+function moveNodes(nodePos, stepSize=null, diamXY=1.3){
     
-    const nodePosArray2d = tf.tidy( () =>  singleStepForceDirected(funcEdges, nodePos, stepSize));
+    let nodePosArray2d = tf.tidy( () =>  singleStepForceDirected(funcEdges, nodePos, stepSize, diamXY));
+    const bounds = {upper:[2, 2], lower:[-2, -2]};
+    nodePosArray2d = tf.tidy( () =>  scaleToBounds(nodePosArray2d, bounds) );
     // Cooling and convergence criteria right here
 
     edgePos = nodePos2edgePos(nodePosArray2d);
@@ -257,33 +232,6 @@ function nodePos2edgePos(nodePosArr){
     return edgePos;
 }
 
-/**
- * Makes edge defining points from edge topology object
- * @param {*} edges Array whose entries are edges with ['source', 'destination']
- * @param {*} pos Object whose fields are entity ids with [pos_x, pos_y] array describing 2D position
- * @param {*} elavate If true, elavates the entities according the mean value of their risks in z direction
- * @returns [edgeTopologyPositions]
- *  edgeTopologyPositions: Float32Array of source position coordinates and destination  position coordinates
- */
-function makeEdgePositions(edges, pos, elavate){
-    const nEdges = Object.keys(edges).length;
-    const edgeTopologyPositions = new Float32Array( nEdges * 2 * 3 );
-    let src, dst;
-
-    for (let i = 0; i < edges.length; i++) {
-
-        [src, dst] = edges[i];
-
-        edgeTopologyPositions[ 6 * i ] = pos[src][0]; 
-        edgeTopologyPositions[ 6 * i + 1] = pos[src][1];
-        edgeTopologyPositions[ 6 * i + 2] = elavate ? risk_mean[src] : 0;
-        edgeTopologyPositions[ 6 * i + 3] = pos[dst][0]; 
-        edgeTopologyPositions[ 6 * i + 4] = pos[dst][1];
-        edgeTopologyPositions[ 6 * i + 5] = elavate ? risk_mean[dst] : 0;
-
-        return [edgeTopologyPositions];
-    }
-}
 
 /**
  * Makes edge defining points from functional connectivity edge array
@@ -332,66 +280,14 @@ function makeAllEdges(pos, elavate) {
 }
 
 
-function makeOutline( scene ) {
-    const pieOutline = new THREE.Group();
-    scene.add(pieOutline);
-
-    const outlineMaterial = new THREE.LineBasicMaterial( { color: 0xffffff } );
-
-    const outerCircle = new THREE.EllipseCurve(
-        0,  0,            // ax, aY
-        extras.radius + extras.diam_xy/2, extras.radius + extras.diam_xy/2,  // xRadius, yRadius
-        0,  2 * Math.PI,  // aStartAngle, aEndAngle
-        false,            // aClockwise
-        0                 // aRotation
-    );
-    let points = outerCircle.getPoints( 1000 );
-    let pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
-    const outerLine = new THREE.Line( pieGeometry, outlineMaterial );
-    pieOutline.add(outerLine);
-
-    const innerCircle = new THREE.EllipseCurve(
-        0,  0,            // ax, aY
-        extras.radius - extras.diam_xy/2, extras.radius - extras.diam_xy/2,  // xRadius, yRadius
-        0,  2 * Math.PI,  // aStartAngle, aEndAngle
-        false,            // aClockwise
-        0                 // aRotation
-    );
-    points = innerCircle.getPoints( 1000 );
-    pieGeometry = new THREE.BufferGeometry().setFromPoints( points );
-    const innerLine = new THREE.Line( pieGeometry, outlineMaterial );
-    pieOutline.add(innerLine);
-
-    // The Line Segments
-
-    const n_segments = extras.n_cluster - 1;
-
-    for (let i = 0; i < n_segments ; i++) {
-        
-        const phi = 2 * Math.PI / n_segments;
-        let nu_i = phi * i + phi / 2;
-
-        let points = [];
-        points.push( new THREE.Vector3( (extras.radius - extras.diam_xy/2) * Math.sin( nu_i),
-                                        (extras.radius - extras.diam_xy/2) * Math.cos( nu_i), 0 ) );
-        points.push( new THREE.Vector3( (extras.radius + extras.diam_xy/2) * Math.sin( nu_i),
-                                        (extras.radius + extras.diam_xy/2) * Math.cos( nu_i), 0 ) );
-
-        const geometry = new THREE.BufferGeometry().setFromPoints( points );
-        const line = new THREE.Line( geometry, outlineMaterial );
-        pieOutline.add(line);
-    }
-    return pieOutline
-}
-
 function animate() {
     
     const time = Date.now() * 0.001;
 
     if (effectController.activateForce){
         if ( counter % nFrame == 0) {
-            nodePos = moveNodes(nodePos, stepSize);
-            stepSize = (stepSize > dt) ? stepSize - dt : 0;
+            nodePos = moveNodes(nodePos, stepSize, 2.3);
+            //stepSize = (stepSize > dt) ? stepSize - dt : 0;
             
         }
         counter += 1;
