@@ -28,7 +28,7 @@ cic_conn_param_specs = {
                       'dst_feature_col': ' Bwd Packet Length Mean'},
     'Flow Duration': {'method': 'total', 'src_feature_col': ' Flow Duration', 'dst_feature_col': ' Flow Duration'},
     'Flow Speed': {'method': 'average', 'src_feature_col': 'Flow Bytes/s', 'dst_feature_col': 'Flow Bytes/s'},
-    'Response Time': {'method': 'average', 'src_feature_col': ' Flow IAT Mean', 'dst_feature_col': ' Flow IAT Mean'},
+    'Response Time': {'method': 'average', 'src_feature_col': ' Bwd IAT Mean', 'dst_feature_col': ' Fwd IAT Mean'},
     'Packet Delay': {'method': 'average', 'src_feature_col': ' Fwd IAT Mean', 'dst_feature_col': ' Bwd IAT Mean'},
     'Header Length': {'method': 'average', 'src_feature_col': ' Fwd Header Length',
                       'dst_feature_col': ' Bwd Header Length'},
