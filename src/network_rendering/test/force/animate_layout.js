@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
 
+import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -12,7 +13,7 @@ import {singleStepForceDirected, scaleToBounds} from './force-directed.js'
 
 console.log(data);
 
-let camera, scene, renderer;
+let camera, scene, renderer, stats;
 let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
@@ -94,6 +95,7 @@ function init(){
     camera.position.z = 4;
     scene.add(camera)
 
+
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
     scene.background = new THREE.Color( 0xc4c4c4 );
@@ -111,6 +113,12 @@ function init(){
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize( window.innerWidth, window.innerHeight );
     document.body.appendChild( renderer.domElement );
+
+    // Stats & Resize Window
+    stats = new Stats();
+    document.body.appendChild( stats.dom );
+
+    window.addEventListener( 'resize', onWindowResize );
 
     // Geometries & Material
     
@@ -175,6 +183,15 @@ function init(){
 
     const controls = new OrbitControls( camera, renderer.domElement );   
     
+}
+
+function onWindowResize() {
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize( window.innerWidth, window.innerHeight );
+
 }
 
 function moveNodes(nodePos, stepSize=null, diamXY=1.3){
@@ -293,10 +310,12 @@ function animate() {
         counter += 1;
     }
     
-
+    renderer.clear();
 	renderer.render( scene, camera );
 
     requestAnimationFrame( animate );
+
+    stats.update();
 }
 
 

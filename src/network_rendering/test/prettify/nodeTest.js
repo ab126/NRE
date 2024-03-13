@@ -1,19 +1,17 @@
 import * as THREE from 'three';
 
+import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import vertexShader from '../../shaders/vertex.glsl.js'
 import fragmentShader from '../../shaders/fragment.glsl.js'
 
-import * as data from '../../saves/net_data_small.json' assert {type: 'json'}; // 63
-
-console.log(data);
-
-let camera, scene, renderer;
+let camera, scene, renderer, stats;
 let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
+let uiScene, orthoCamera, sprite;
 
 // Node parameters
 const baseSize = 0.03; //0.05
@@ -29,6 +27,7 @@ const effectController = {
 //const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
 let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
 const nNodes = Object.keys(pos).length;
+console.log(pos)
 
 init();
 animate();
@@ -104,7 +103,7 @@ function init(){
 
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
-    scene.background = new THREE.Color( 0xc4c4c4 );
+    //scene.background = new THREE.Color( 0xc4c4c4 );
 
     //Plane
     const planeGeometry = new THREE.PlaneGeometry( 8, 8 );
@@ -117,6 +116,12 @@ function init(){
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize( window.innerWidth, window.innerHeight );
     document.body.appendChild( renderer.domElement );
+
+    // Stats & Resize Window
+    stats = new Stats();
+    document.body.appendChild( stats.dom );
+
+    window.addEventListener( 'resize', onWindowResize );
 
     // Geometries & Material
     
@@ -180,6 +185,15 @@ function init(){
 
     const controls = new OrbitControls( camera, renderer.domElement );   
     
+}
+
+function onWindowResize() {
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize( window.innerWidth, window.innerHeight );
+
 }
 
 function updateMaterial() {
@@ -293,6 +307,8 @@ function animate() {
 	renderer.render( scene, camera );
 
     requestAnimationFrame( animate );
+
+    stats.update();
 }
 
 
