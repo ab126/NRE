@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 
 import vertexShader from '../../shaders/vertex.glsl.js'
 import fragmentShader from '../../shaders/fragment.glsl.js'
@@ -11,13 +12,27 @@ let camera, scene, renderer, stats;
 let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
-let uiScene, orthoCamera, sprite, lut;
+let uiScene, orthoCamera, sprite, font;
 
-// Node parameters
+// Legend Parameters
+const defWidth = 1381;
+const defHeight = 945;
+
+// Node & Edge Parameters
 const baseSize = 0.03; //0.05
 const sizeMult = .07;
 const nodeGeometry = new THREE.ConeGeometry( 0.1, 0.2, 3 );
 const nodeMaterial = new THREE.MeshPhongMaterial();//new THREE.MeshStandardMaterial( {color: 0x0a0859} );
+
+const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    transparent: true,
+} );
+
+const edgeMaterial = new THREE.LineBasicMaterial({
+    color: '#ff2929'
+});
 
 const effectController = {
     showConnectivity: true
@@ -53,6 +68,7 @@ function init(){
     camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
     camera.position.z = 4;
     scene.add(camera);
+
 
     // Legend
     generateLegend();
@@ -129,11 +145,6 @@ function init(){
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
     
-    const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader,
-        transparent: true,
-    } );
 
     edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     scene.add( edgeConnectivity );
@@ -144,32 +155,126 @@ function init(){
     
 }
 
+
+
 function generateLegend(){
 
     // Scene
     uiScene = new THREE.Scene();
     orthoCamera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, .1, 2 );
+    //orthoCamera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
     orthoCamera.position.set( -0.8, 0, 1 );
 
+    // Spacing
+    const group = new THREE.Group();
+    const scale = 1.5;
+
     // Sprite
+    // 0,0 is the center
     sprite = new THREE.Sprite( new THREE.SpriteMaterial( { color:'#424242' } ) );
     sprite.scale.x = 0.4;
+    sprite.position.set(0, 0, 0);
+    group.add(sprite);
     uiScene.add( sprite );
 
     // Node
-    const node = new THREE.Mesh( nodeGeometry, nodeMaterial );
-    node.position.set(-0.1, 0.4, 0);
-    node.scale.set(0.5, 0.5, 0.5);
-    uiScene.add(node);
+    const entity = new THREE.Mesh( nodeGeometry, nodeMaterial );
+    entity.position.set(-0.13, 0.25, 0);
+    entity.scale.set(0.5, 0.5, 0.5);
+    group.add(entity);
+    uiScene.add(entity);
+
+    // Text Test
+    const headerMat = new THREE.MeshBasicMaterial( {
+        color: 0xffffff,
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide
+    } );
+
+    const liteMat = new THREE.MeshBasicMaterial( {
+        color: 0xffffff,
+        transparent: true,
+        opacity: .8,
+        side: THREE.DoubleSide
+    } );
+
+
+    addFont("Legend", [ -.09, .42, 0], headerMat);
+    const pts = new Float32Array([-.19, .39, 0,  .17, .39, 0 ]);
+    const lineGeometry = new THREE.BufferGeometry();
+    lineGeometry.setAttribute( 'position', new THREE.BufferAttribute( pts, 3 ).setUsage( THREE.DynamicDrawUsage ) );
+    const line = new THREE.Line(lineGeometry, headerMat);
+    uiScene.add(line);
+
+    addFont(": Entities", [ -.09, .22, 0], liteMat);
+    addFont(": Functional\n Connectivity", [ -.09, .04, 0], liteMat);
+    addFont(": Risk\n Mean", [ -.09, -.14, 0], liteMat);
 
     // Edge 
-    
+
+    const pointMaterial = new THREE.PointsMaterial( {
+        color: 0x242323,
+        size: 4,//4
+        //blending: THREE.AdditiveBlending,
+        transparent: false,
+        sizeAttenuation: false
+    } );
+
+    const pointGeometry = new THREE.BufferGeometry();
+    const edgePointPositions = new Float32Array([-.16, .0, .1, -.11, .10, .1 ]);
+    pointGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
+    const edgePoints = new THREE.Points( pointGeometry, pointMaterial );
+    group.add(edgePoints);
+    uiScene.add(edgePoints);
+
+
+    const edgeGeometry = new THREE.BufferGeometry()
+    edgeGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions, 3 ) );    
+    const edge = new THREE.LineSegments( edgeGeometry, edgeMaterial );
+    group.add(edge);
+    uiScene.add( edge );
+
+    // Colored Node
+    const colorNode = new THREE.Mesh( nodeGeometry, nodeMaterial );
+    colorNode.position.set(-0.13, -.14, 0);
+    colorNode.scale.set(0.5, 0.5, 0.5);
+    group.add(colorNode);
+    //uiScene.add(colorNode);
+
+    //group.scale.set(scale, scale, scale);
+
+}
+
+function addFont(message, textPos, textMaterial){
+
+    const loader = new FontLoader();
+
+    loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
+
+        const shapes = font.generateShapes(message, .04);
+        const geometry = new THREE.ShapeGeometry( shapes );
+        const text = new THREE.Mesh( geometry, textMaterial );
+        text.scale.set(0.8, 1, 1);
+        text.position.set(...textPos); // -.02, .37, 0
+        uiScene.add( text );
+
+        animate();
+
+    } );
 }
 
 function onWindowResize() {
 
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+
+    // Leave Legend Same Size
+    orthoCamera.left = -2 * window.innerWidth / defWidth + 1;
+    orthoCamera.top = 1 * window.innerHeight / defHeight;
+    orthoCamera.bottom = -1 * window.innerHeight / defHeight;
+    orthoCamera.updateProjectionMatrix();
+    //console.log([window.innerWidth, window.innerHeight]);
 
     renderer.setSize( window.innerWidth, window.innerHeight );
 
