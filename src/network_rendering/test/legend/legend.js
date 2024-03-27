@@ -12,11 +12,11 @@ let camera, scene, renderer, stats;
 let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
-let uiScene, orthoCamera, sprite, font;
+let uiScene, orthoCamera, font;
 
 // Legend Parameters
-const defWidth = 1381;
-const defHeight = 945;
+const defWidth = 900; 
+const defHeight = 500; 
 
 // Node & Edge Parameters
 const baseSize = 0.03; //0.05
@@ -164,27 +164,35 @@ function generateLegend(){
     orthoCamera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, .1, 2 );
     //orthoCamera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
     orthoCamera.position.set( -0.8, 0, 1 );
+    orthoCamera.left = -2 * window.innerWidth / defWidth + 1;
+    orthoCamera.top = 1 * window.innerHeight / defHeight;
+    orthoCamera.bottom = -1 * window.innerHeight / defHeight;
+    orthoCamera.updateProjectionMatrix();
 
-    // Spacing
-    const group = new THREE.Group();
-    const scale = 1.5;
+    // Organization
+    const legend = new THREE.Group();
+    const legendHeader = new THREE.Group();
+    const nodeSegment = new THREE.Group();
+    const connectivitySegment = new THREE.Group();
+    const riskSegment = new THREE.Group();
+
+    legend.add(legendHeader);
+    legend.add(nodeSegment);
+    legend.add(connectivitySegment);
+    legend.add(riskSegment);
+    uiScene.add(legend);
 
     // Sprite
     // 0,0 is the center
-    sprite = new THREE.Sprite( new THREE.SpriteMaterial( { color:'#424242' } ) );
+    const sprite = new THREE.Sprite( new THREE.SpriteMaterial( { color:'#424242' } ) );
     sprite.scale.x = 0.4;
     sprite.position.set(0, 0, 0);
-    group.add(sprite);
-    uiScene.add( sprite );
+    legend.add( sprite );
 
-    // Node
-    const entity = new THREE.Mesh( nodeGeometry, nodeMaterial );
-    entity.position.set(-0.13, 0.25, 0);
-    entity.scale.set(0.5, 0.5, 0.5);
-    group.add(entity);
-    uiScene.add(entity);
+    // Text Parameters
 
-    // Text Test
+    const textYShift = -0.02;
+
     const headerMat = new THREE.MeshBasicMaterial( {
         color: 0xffffff,
         transparent: true,
@@ -199,20 +207,30 @@ function generateLegend(){
         side: THREE.DoubleSide
     } );
 
-
-    addFont("Legend", [ -.09, .42, 0], headerMat);
+    // Header
+    addFont("Legend", [ -.09, .42, 0], headerMat, legendHeader);
+    
     const pts = new Float32Array([-.19, .39, 0,  .17, .39, 0 ]);
     const lineGeometry = new THREE.BufferGeometry();
     lineGeometry.setAttribute( 'position', new THREE.BufferAttribute( pts, 3 ).setUsage( THREE.DynamicDrawUsage ) );
     const line = new THREE.Line(lineGeometry, headerMat);
-    uiScene.add(line);
+    legendHeader.add(line);
 
-    addFont(": Entities", [ -.09, .22, 0], liteMat);
-    addFont(": Functional\n Connectivity", [ -.09, .04, 0], liteMat);
-    addFont(": Risk\n Mean", [ -.09, -.14, 0], liteMat);
+    // Node Segment
+    const [xPos1, yPos1] = legendSegmentLocations(2, 0.3, 0.2);
 
-    // Edge 
+    const entitySample = new THREE.Mesh( nodeGeometry, nodeMaterial );
+    entitySample.position.set(xPos1[1], yPos1[1], 0); // -0.13, 0.25
+    entitySample.scale.set(0.5, 0.5, 0.5);
+    nodeSegment.add( entitySample );
 
+    addFont(": Entities", [ xPos1[2], yPos1[1] + textYShift, 0], liteMat, nodeSegment); // -.09, .22
+
+    // Connectivity Segment
+    const [ptsShiftx, ptsShifty] = [0.025, 0.05];
+    const [xPos2, yPos2] = legendSegmentLocations(2, 0, 0.2);
+    console.log(xPos2, yPos2);
+    
     const pointMaterial = new THREE.PointsMaterial( {
         color: 0x242323,
         size: 4,//4
@@ -221,32 +239,55 @@ function generateLegend(){
         sizeAttenuation: false
     } );
 
-    const pointGeometry = new THREE.BufferGeometry();
-    const edgePointPositions = new Float32Array([-.16, .0, .1, -.11, .10, .1 ]);
-    pointGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
-    const edgePoints = new THREE.Points( pointGeometry, pointMaterial );
-    group.add(edgePoints);
-    uiScene.add(edgePoints);
+    const edgeSample = new THREE.Group();
+    connectivitySegment.add(edgeSample);
 
+    const pointGeometry = new THREE.BufferGeometry();
+    const edgePointPositions = new Float32Array([xPos2[1] - ptsShiftx, yPos2[1] - ptsShifty, .01, xPos2[1] + ptsShiftx, yPos2[1] + ptsShifty, .01 ]); //[-.16, .0, .1, -.11, .10, .1 ]
+    pointGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
+    const edgeSamplePoints = new THREE.Points( pointGeometry, pointMaterial );
+    edgeSample.add(edgeSamplePoints);
 
     const edgeGeometry = new THREE.BufferGeometry()
     edgeGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions, 3 ) );    
     const edge = new THREE.LineSegments( edgeGeometry, edgeMaterial );
-    group.add(edge);
-    uiScene.add( edge );
+    edgeSample.add(edge);
 
-    // Colored Node
+    addFont(": Functional\n Connectivity", [xPos2[2], yPos2[1] + textYShift, 0], liteMat, connectivitySegment); //  -.09, .04, 0
+
+    // Risk Segment
+    const [xPos3, yPos3] = legendSegmentLocations(2, -0.2, 0.2);
+
     const colorNode = new THREE.Mesh( nodeGeometry, nodeMaterial );
     colorNode.position.set(-0.13, -.14, 0);
     colorNode.scale.set(0.5, 0.5, 0.5);
-    group.add(colorNode);
-    //uiScene.add(colorNode);
-
-    //group.scale.set(scale, scale, scale);
+    //riskSegment.add(colorNode);
+    addFont(": Risk\n Mean", [ xPos3[2], yPos3[1] + textYShift, 0], liteMat, riskSegment); // -.09, -.14, 0
 
 }
 
-function addFont(message, textPos, textMaterial){
+/*
+*/
+/** Return the layout location of each row in the segment and preset horizontal coords.
+ *      Segment is centered
+ *      
+ * @param {*} nRows Number of rows in a segment
+ * @param {*} ySegment y coordinate of the segment center
+ * @param {*} widthPerc Width of the segment divided by the legend width
+ * @param {*} heightPerc Height of the segment divided by the legend height
+ * @param {*} legendWidth Width of the legend box
+ * @param {*} legendHeight Height of the legend box
+ */
+function legendSegmentLocations(nRows, ySegment, heightPerc, widthPerc = 0.9, legendWidth=0.4, legendHeight=1){
+    const lineHeight = legendHeight * heightPerc / nRows;
+    const startYPos = ySegment + legendHeight * heightPerc / 2 - lineHeight / 2;
+    const yPos = Array.from({length: nRows}, (_, i) => startYPos - lineHeight * i);
+    const xPos = Array( -widthPerc * legendWidth * 0.5, -widthPerc * legendWidth * 0.3, -widthPerc * legendWidth * 0.2);
+
+    return [xPos, yPos]
+}
+
+function addFont(message, textPos, textMaterial, group2Add){
 
     const loader = new FontLoader();
 
@@ -255,9 +296,9 @@ function addFont(message, textPos, textMaterial){
         const shapes = font.generateShapes(message, .04);
         const geometry = new THREE.ShapeGeometry( shapes );
         const text = new THREE.Mesh( geometry, textMaterial );
-        text.scale.set(0.8, 1, 1);
-        text.position.set(...textPos); // -.02, .37, 0
-        uiScene.add( text );
+        text.scale.set(0.6, 1, 1);
+        text.position.set(...textPos); 
+        group2Add.add( text );
 
         animate();
 
