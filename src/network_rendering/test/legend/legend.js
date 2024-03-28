@@ -21,8 +21,9 @@ const defHeight = 500;
 // Node & Edge Parameters
 const baseSize = 0.03; //0.05
 const sizeMult = .07;
-const nodeGeometry = new THREE.ConeGeometry( 0.1, 0.2, 3 );
-const nodeMaterial = new THREE.MeshPhongMaterial();//new THREE.MeshStandardMaterial( {color: 0x0a0859} );
+const nodeGeometry = new THREE.OctahedronGeometry( 0.1, 4 );
+const nodeGeometry2 = new THREE.ConeGeometry( 0.1, 0.2, 5 );
+const nodeMaterial = new THREE.MeshPhongMaterial({color:'#525252'});//new THREE.MeshStandardMaterial( {color: 0x0a0859} );
 
 const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
     vertexShader: vertexShader,
@@ -32,6 +33,10 @@ const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
 
 const edgeMaterial = new THREE.LineBasicMaterial({
     color: '#ff2929'
+});
+
+const edgeMaterial2 = new THREE.LineBasicMaterial({
+    color: '#fbff29'
 });
 
 const effectController = {
@@ -69,13 +74,14 @@ function init(){
     camera.position.z = 4;
     scene.add(camera);
 
-
     // Legend
     generateLegend();
 
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
     scene.background = new THREE.Color( 0xc4c4c4 );
+
+    uiScene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
 
     //Plane
     const planeGeometry = new THREE.PlaneGeometry( 8, 8 );
@@ -87,7 +93,7 @@ function init(){
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.autoClear = false;
-    renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.setSize( window.innerWidth, window.innerHeight);
     document.body.appendChild( renderer.domElement );
 
     // Stats & Resize Window
@@ -184,14 +190,15 @@ function generateLegend(){
 
     // Sprite
     // 0,0 is the center
+    const [legendWidth, legendHeight] = [0.4, 1.5];
     const sprite = new THREE.Sprite( new THREE.SpriteMaterial( { color:'#424242' } ) );
-    sprite.scale.x = 0.4;
+    sprite.scale.set(0.4, 1.5, 1);
     sprite.position.set(0, 0, 0);
     legend.add( sprite );
 
     // Text Parameters
 
-    const textYShift = -0.02;
+    const textYShift = 0.02;
 
     const headerMat = new THREE.MeshBasicMaterial( {
         color: 0xffffff,
@@ -208,61 +215,87 @@ function generateLegend(){
     } );
 
     // Header
-    addFont("Legend", [ -.09, .42, 0], headerMat, legendHeader);
+    const [xPos0, yPos0] = [-.05, legendHeight/2 - 3*textYShift];
+    const margin = 0.01;
+
+    addFont("Legend", [xPos0, yPos0 , 0], headerMat, legendHeader); // -.09, .42
     
-    const pts = new Float32Array([-.19, .39, 0,  .17, .39, 0 ]);
+    const pts = new Float32Array([-legendWidth/2 + margin, yPos0 - textYShift - margin, 0,  legendWidth/2 - margin, yPos0 - textYShift - margin, 0 ]); // -.19, .39, 0,  .17, .39, 0 
     const lineGeometry = new THREE.BufferGeometry();
     lineGeometry.setAttribute( 'position', new THREE.BufferAttribute( pts, 3 ).setUsage( THREE.DynamicDrawUsage ) );
     const line = new THREE.Line(lineGeometry, headerMat);
     legendHeader.add(line);
 
     // Node Segment
-    const [xPos1, yPos1] = legendSegmentLocations(2, 0.3, 0.2);
+    const [xPos1, yPos1] = legendSegmentLocations(3, 0.5, 0.35);
 
+    addFont("Entity", [ xPos1[0], yPos1[0] - textYShift, 0], liteMat, nodeSegment); // -.09, .22
+    
+    const routerSample = new THREE.Mesh( nodeGeometry2, nodeMaterial );
+    routerSample.position.set(xPos1[1], yPos1[1], 0); // -0.13, 0.25
+    routerSample.scale.set(0.25, 0.5, 0.5);
+    nodeSegment.add( routerSample );
+    addFont(": Router/Switch", [ xPos1[2], yPos1[1] - textYShift, 0], liteMat, nodeSegment); // -.09, .22
+    
     const entitySample = new THREE.Mesh( nodeGeometry, nodeMaterial );
-    entitySample.position.set(xPos1[1], yPos1[1], 0); // -0.13, 0.25
-    entitySample.scale.set(0.5, 0.5, 0.5);
+    entitySample.position.set(xPos1[1], yPos1[2], 0); // -0.13, 0.25
+    entitySample.scale.set(0.25, 0.5, 0.5);
     nodeSegment.add( entitySample );
+    addFont(": Endpoints", [ xPos1[2], yPos1[2] - textYShift, 0], liteMat, nodeSegment); // -.09, .22
 
-    addFont(": Entities", [ xPos1[2], yPos1[1] + textYShift, 0], liteMat, nodeSegment); // -.09, .22
 
     // Connectivity Segment
+
     const [ptsShiftx, ptsShifty] = [0.025, 0.05];
-    const [xPos2, yPos2] = legendSegmentLocations(2, 0, 0.2);
-    console.log(xPos2, yPos2);
+    const [xPos2, yPos2] = legendSegmentLocations(3, 0.15, 0.4);
     
-    const pointMaterial = new THREE.PointsMaterial( {
-        color: 0x242323,
-        size: 4,//4
-        //blending: THREE.AdditiveBlending,
-        transparent: false,
-        sizeAttenuation: false
-    } );
 
     const edgeSample = new THREE.Group();
     connectivitySegment.add(edgeSample);
 
-    const pointGeometry = new THREE.BufferGeometry();
-    const edgePointPositions = new Float32Array([xPos2[1] - ptsShiftx, yPos2[1] - ptsShifty, .01, xPos2[1] + ptsShiftx, yPos2[1] + ptsShifty, .01 ]); //[-.16, .0, .1, -.11, .10, .1 ]
-    pointGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
-    const edgeSamplePoints = new THREE.Points( pointGeometry, pointMaterial );
-    edgeSample.add(edgeSamplePoints);
+    addFont("Connectivity", [xPos2[0], yPos2[0] - textYShift, 0], liteMat, connectivitySegment); //  -.09, .04, 0
 
+    const edgePointPositions = new Float32Array([xPos2[1] - ptsShiftx, yPos2[1] - ptsShifty, .01, xPos2[1] + ptsShiftx, yPos2[1] + ptsShifty, .01 ]); //[-.16, .0, .1, -.11, .10, .1 ]
     const edgeGeometry = new THREE.BufferGeometry()
     edgeGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions, 3 ) );    
     const edge = new THREE.LineSegments( edgeGeometry, edgeMaterial );
     edgeSample.add(edge);
+    addFont(": Functional\n Connectivity", [xPos2[2], yPos2[1] , 0], liteMat, connectivitySegment); //  -.09, .04, 0
 
-    addFont(": Functional\n Connectivity", [xPos2[2], yPos2[1] + textYShift, 0], liteMat, connectivitySegment); //  -.09, .04, 0
+    const edgePointPositions2 = new Float32Array([xPos2[1] - ptsShiftx, yPos2[2] - ptsShifty, .01, xPos2[1] + ptsShiftx, yPos2[2] + ptsShifty, .01 ]); //[-.16, .0, .1, -.11, .10, .1 ]
+    const edgeGeometry2 = new THREE.BufferGeometry()
+    edgeGeometry2.setAttribute( 'position', new THREE.BufferAttribute( edgePointPositions2, 3 ) );    
+    const edge2 = new THREE.LineSegments( edgeGeometry2, edgeMaterial2 );
+    edgeSample.add(edge2);
+    addFont(": Topology", [xPos2[2], yPos2[2] - textYShift, 0], liteMat, connectivitySegment); //  -.09, .04, 0
+
 
     // Risk Segment
-    const [xPos3, yPos3] = legendSegmentLocations(2, -0.2, 0.2);
+    const [xPos3, yPos3] = legendSegmentLocations(4, -0.2, 0.3);
 
     const colorNode = new THREE.Mesh( nodeGeometry, nodeMaterial );
     colorNode.position.set(-0.13, -.14, 0);
     colorNode.scale.set(0.5, 0.5, 0.5);
     //riskSegment.add(colorNode);
-    addFont(": Risk\n Mean", [ xPos3[2], yPos3[1] + textYShift, 0], liteMat, riskSegment); // -.09, -.14, 0
+
+    addFont("Risk", [ xPos3[0], yPos3[0] - textYShift, 0], liteMat, riskSegment); // -.09, -.14, 0
+    addFont(": Prior", [ xPos3[2], yPos3[1] - textYShift, 0], liteMat, riskSegment); 
+    addFont(": Measured", [ xPos3[2], yPos3[2] - textYShift, 0], liteMat, riskSegment); 
+    addFont(": Estimated", [ xPos3[2], yPos3[3] - textYShift, 0], liteMat, riskSegment); 
+
+    // Nomenclature
+    const [xPos4, yPos4] = legendSegmentLocations(7, -0.55, 0.38);
+    const noteSize = 0.03 * 2.5/3;
+
+    addFont("Nomenclature", [ xPos4[0], yPos4[0] - textYShift, 0], liteMat, riskSegment); // -.09, -.14, 0
+    addFont("   [0,1]: 0 - low risk, 1 - high risk ", [ xPos4[0], yPos4[1] - textYShift, 0], liteMat, riskSegment, 0.025); 
+    addFont("   Transparancy: Strenght of Connectivity ", [ xPos4[0], yPos4[2] - textYShift, 0], liteMat, riskSegment, 0.025); 
+    addFont("   Color: blue - low, red - high ", [ xPos4[0], yPos4[3] - textYShift, 0], liteMat, riskSegment, 0.025); 
+    addFont("   Circle: Entity ", [ xPos4[0], yPos4[4] - textYShift, 0], liteMat, riskSegment, 0.025); 
+    addFont("   Arc: Connectivity ", [ xPos4[0], yPos4[5] - textYShift, 0], liteMat, riskSegment, 0.025); 
+    addFont("   Circle Size: Traffic Quantity", [ xPos4[0], yPos4[6] - textYShift, 0], liteMat, riskSegment, 0.025); 
+    
+
 
 }
 
@@ -282,18 +315,18 @@ function legendSegmentLocations(nRows, ySegment, heightPerc, widthPerc = 0.9, le
     const lineHeight = legendHeight * heightPerc / nRows;
     const startYPos = ySegment + legendHeight * heightPerc / 2 - lineHeight / 2;
     const yPos = Array.from({length: nRows}, (_, i) => startYPos - lineHeight * i);
-    const xPos = Array( -widthPerc * legendWidth * 0.5, -widthPerc * legendWidth * 0.3, -widthPerc * legendWidth * 0.2);
+    const xPos = Array( -widthPerc * legendWidth * 0.5, -widthPerc * legendWidth * 0.35, -widthPerc * legendWidth * 0.2);
 
     return [xPos, yPos]
 }
 
-function addFont(message, textPos, textMaterial, group2Add){
+function addFont(message, textPos, textMaterial, group2Add, size=0.03){
 
     const loader = new FontLoader();
 
     loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
 
-        const shapes = font.generateShapes(message, .04);
+        const shapes = font.generateShapes(message, size);
         const geometry = new THREE.ShapeGeometry( shapes );
         const text = new THREE.Mesh( geometry, textMaterial );
         text.scale.set(0.6, 1, 1);
