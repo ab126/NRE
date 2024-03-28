@@ -22,8 +22,14 @@ const defHeight = 500;
 const baseSize = 0.03; //0.05
 const sizeMult = .07;
 const nodeGeometry = new THREE.OctahedronGeometry( 0.1, 4 );
-const nodeGeometry2 = new THREE.ConeGeometry( 0.1, 0.2, 5 );
-const nodeMaterial = new THREE.MeshPhongMaterial({color:'#525252'});//new THREE.MeshStandardMaterial( {color: 0x0a0859} );
+const nodeGeometry2 = new THREE.OctahedronGeometry( 0.11, 0 );
+const nodeMaterial = new THREE.MeshPhongMaterial({
+    color:'#17ff0f',
+    emissive:'#000000',
+    emissiveIntensity:0,
+    specular:'#ffffff',
+    shininess:30
+});//new THREE.MeshStandardMaterial( {color: 0x0a0859} );
 
 const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
     vertexShader: vertexShader,
@@ -78,8 +84,16 @@ function init(){
     generateLegend();
 
     // Lights
-    scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
     scene.background = new THREE.Color( 0xc4c4c4 );
+    scene.add( new THREE.AmbientLight( 0xf0f0f0, 0.8 ) );    
+
+    const light = new THREE.DirectionalLight( 0xffffff, 0.5 );
+    light.position.set(1, 1, 1);
+    scene.add( light );
+
+    const uiLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+    uiLight.position.set(1, 1, 1);
+    uiScene.add( uiLight );
 
     uiScene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
 
@@ -135,6 +149,9 @@ function init(){
         nodeSizes[i] = baseSize + sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);        
 
         const node = new THREE.Mesh( nodeGeometry, nodeMaterial );
+        if (i == 0){
+            node.geometry = nodeGeometry2;
+        }
         node.rotateX(Math.PI /2);
 
         node.position.set(nodePosArray[i][0], nodePosArray[i][1], 0);
