@@ -95,7 +95,6 @@ function init(){
     camera.position.z = 4;
     scene.add(camera)
 
-
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
     scene.background = new THREE.Color( 0xc4c4c4 );
@@ -160,7 +159,8 @@ function init(){
         dodec.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entityGroup.add( dodec );
     }
-    //console.log(nodeSizes);
+    
+
     // Edges
 
     // Connectivity

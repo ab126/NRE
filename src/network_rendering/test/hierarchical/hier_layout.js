@@ -1,64 +1,83 @@
 import * as THREE from 'three';
+import * as tf from '@tensorflow/tfjs';
 
 import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import {generateLegend} from '../legend/legend.js'
+import vertexShader from '../../shaders/vertex.glsl.js'
+import fragmentShader from '../../shaders/fragment.glsl.js'
 
-const fontPath = '../legend/fonts/helvetiker_regular.typeface.json'
+import {generateLegend} from '../legend/legendMaker.js';
+import {makeNodes, makeConnectivityEdges} from './graphMaker.js';
+import {singleStepForceDirected, scaleToBounds} from '../force/force-directed.js'
+import * as data from '../../saves/net_data_medium2.json' assert {type: 'json'}; // 63
+
+console.log(data);
+
+const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
 let camera, scene, renderer, stats;
 let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
-let uiScene, orthoCamera, font;
+let uiScene, orthoCamera;
 
 // Legend Parameters
 const defWidth = 900; 
 const defHeight = 500; 
 
 // Node & Edge Parameters
-const baseSize = 0.03; //0.05
-const sizeMult = .07;
-const nodeGeometry = new THREE.OctahedronGeometry( 0.1, 4 );
-const nodeGeometry2 = new THREE.OctahedronGeometry( 0.11, 0 );
+const sizeMult = .5;
+const entityGeometry = new THREE.OctahedronGeometry( 0.05, 4 ); // 0.1, 4
+const routerGeometry = new THREE.OctahedronGeometry( 0.055, 0 ); // 0.11, 0
 const nodeMaterial = new THREE.MeshPhongMaterial({
-    color:'#17ff0f',
+    color:'#000000',
     emissive:'#000000',
-    emissiveIntensity:0,
+    emissiveIntensity:1,
     specular:'#ffffff',
     shininess:30
-});//new THREE.MeshStandardMaterial( {color: 0x0a0859} );
+});
 
-const edgeConnectivityMaterial = new THREE.LineBasicMaterial( {
-	color: 0xffffff,
-	linewidth: 1
+const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    transparent: true,
 } );
 
-const edgeMaterial = new THREE.LineBasicMaterial({
+const connectivityMaterial = new THREE.LineBasicMaterial({
     color: '#ff2929'
 });
 
-const edgeMaterial2 = new THREE.LineBasicMaterial({
+const topologyMaterial = new THREE.LineBasicMaterial({
     color: '#fbff29'
 });
 
+// GUI
 const effectController = {
-    showConnectivity: true
+    showConnectivity: true,
+    colorWithRisks: true,
+    maxIter: 50,
+    stepSize: .1,
+    activateForce: false
 };
 
 // Read planar positions
-//const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
-let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
+const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
+//let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
 const nNodes = Object.keys(pos).length;
 
+let nodePos = Array.from(Object.keys(pos), (key) => pos[key]); // Array of node positions sorted acc. to pos
+let stepSize = .01;
+let dt = stepSize / (effectController.maxIter + 1);
+
+const nFrame = 5;
+let counter = 0;
 
 init();
 animate();
 
 function initGUI(){
-
     const gui = new GUI();
 
     gui.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
@@ -67,6 +86,36 @@ function initGUI(){
 
     } );
 
+    gui.add( effectController, 'colorWithRisks' ).onChange( function ( value ) {
+
+        if (value == true) {
+            for ( let i = 0; i < nNodes; i ++ ) {
+
+                let name = Object.keys(pos)[i];
+                let node = entityGroup.children[i];
+
+                node.material.color.setRGB( risk_mean[name] / extras.diam_z , 0, 0);
+            
+            }
+        } else {
+            for ( let i = 0; i < nNodes; i ++ ) {
+                let name = Object.keys(pos)[i];
+                let node = entityGroup.children[i];
+                node.material.color.setRGB(entityColors[name][0], entityColors[name][1], entityColors[name][2]);
+        
+            }
+        }
+    } );
+
+    gui.add( effectController, 'maxIter', 10, 100, 10).onChange( function ( value ){
+        dt = stepSize / (value + 1);
+    } );
+
+    gui.add( effectController, 'stepSize', .05, .5, .05).onChange( function ( value ){
+       stepSize=value;
+    } );
+
+    gui.add( effectController, 'activateForce' );
 }
 
 function init(){ 
@@ -80,7 +129,7 @@ function init(){
     scene.add(camera);
 
     // Legend
-    [uiScene, orthoCamera] = generateLegend(fontPath);
+    [uiScene, orthoCamera] = generateLegend(fontPath, entityGeometry, routerGeometry, nodeMaterial, connectivityMaterial, topologyMaterial);
 
     // Lights
     scene.background = new THREE.Color( 0xc4c4c4 );
@@ -100,7 +149,7 @@ function init(){
     const planeGeometry = new THREE.PlaneGeometry( 8, 8 );
     const planeMaterial = new THREE.MeshStandardMaterial( { color: 0xa3a3a3 } )
     const plane = new THREE.Mesh( planeGeometry, planeMaterial );
-    plane.position.z = -0.1
+    plane.position.z = -0.1;
     scene.add( plane );
 
     // Renderer
@@ -109,75 +158,34 @@ function init(){
     renderer.setSize( window.innerWidth, window.innerHeight);
     document.body.appendChild( renderer.domElement );
 
-    // Stats & Resize Window
+    // Stats & Resize Window & controller
     stats = new Stats();
     document.body.appendChild( stats.dom );
 
     window.addEventListener( 'resize', onWindowResize );
 
+    const controls = new OrbitControls( camera, renderer.domElement ); 
+
     // Geometries & Material
     
     // Nodes
 
-    entityGroup = new THREE.Group(); // Entity nodes and edges
+    entityGroup = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( entityGroup );
     
-    nodeColors = new Float32Array( nNodes * 4 );
-    nodePosArray = Array(nNodes);
-    const degrees = Array(nNodes);
-    
-
-    for ( let i = 0; i < nNodes; i ++ ) {
-        let name = Object.keys(pos)[i];
-
-        nodePosArray[i] = pos[name];
-        degrees[i] = edges[i].reduce((acc, val) => acc + val );
-
-        nodeColors[ i * 4 ] = effectController.colorWithRisks ? risk[name] / extras.diam_z : entityColors[name][0];
-        nodeColors[ i * 4 + 1] = effectController.colorWithRisks ? 0 : entityColors[name][1];
-        nodeColors[ i * 4 + 2] = effectController.colorWithRisks ? 0 : entityColors[name][2];
-        nodeColors[ i * 4 + 3] = effectController.colorWithRisks ? 1 : entityColors[name][3];
-
-    }
-    const minDeg = Math.min(...degrees);
-    const maxDeg = Math.max(...degrees);
-    nodeSizes = Array(nNodes);
-    
-    
-    for ( let i = 0; i < nNodes; i ++ ) {
-        nodeSizes[i] = baseSize + sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);        
-
-        const node = new THREE.Mesh( nodeGeometry, nodeMaterial );
-        if (i == 0){
-            node.geometry = nodeGeometry2;
-        }
-        node.rotateX(Math.PI /2);
-
-        node.position.set(nodePosArray[i][0], nodePosArray[i][1], 0);
-        //node.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
-        //node.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
-        entityGroup.add( node );
-    }
     
     // Edges
     // Connectivity
-    [edgePos, edgeColors] = makeAllEdges(pos, false);
 
-    const edgeConnectivityGeometry = new THREE.BufferGeometry();
-    edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
-    edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
+    edgeConnectivity = makeConnectivityEdges(edgeConnectivityMaterial, pos, funcEdges, risk_mean);
     
-
-    edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     scene.add( edgeConnectivity );
     edgeConnectivity.visible = effectController.showConnectivity;
     
 
-    const controls = new OrbitControls( camera, renderer.domElement );   
+      
     
 }
-
-
 
 
 function onWindowResize() {
@@ -196,32 +204,38 @@ function onWindowResize() {
 
 }
 
-// Generate sample network at the given location
-function generateSampleNet(xCenter, yCenter = 0, diam = 2){
+function moveNodes(nodePos, stepSize=null, diamXY=1.3){
+    
+    let nodePosArray2d = tf.tidy( () =>  singleStepForceDirected(funcEdges, nodePos, stepSize, diamXY));
+    const bounds = {upper:[2, 2], lower:[-2, -2]};
+    nodePosArray2d = tf.tidy( () =>  scaleToBounds(nodePosArray2d, bounds) );
+    // Cooling and convergence criteria right here
 
-    let pos = {a: [xCenter, yCenter], b: [xCenter, yCenter + diam/2], c: [xCenter - diam/2, yCenter - diam/2],
-                d: [xCenter + diam/2, yCenter - diam/2]};
-    let risk = {a: 0, b:1, c:2, d:3};
-    let edges = [ [0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]];
-    let entityColors = {a:[0.8, 0.2, 1, 1], b:[0, 1, 1, 1], c:[0.2, 0.8, 1, 1], d:[0.6, 0.4, 1, 1]};
-    let extras = {diam_z: 2, radius:1}
+    edgePos = nodePos2edgePos(nodePosArray2d);
+    edgeConnectivity.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
+    edgeConnectivity.geometry.attributes.position.needsUpdate = true;
+    //Topology edges?
 
-    return {pos, risk, edges, entityColors, extras}
+    setNodePos(entityGroup, nodePosArray2d);
+    //console.log(tf.memory());
+
+    return nodePosArray2d;
 }
 
+// Sets the node positions according to the new node position array
+function setNodePos(nodeGroup, nodePos){
+    const nNodes = nodeGroup.children.length;
+    for ( let i = 0; i < nNodes; i ++ ) {
 
-/**
- * Makes edge defining points from functional connectivity edge array
- * @param {*} pos Object whose fields are entity ids with [pos_x, pos_y] array describing 2D position
- * @param {*} elavate If true, elavates the entities according the mean value of their risks in z direction
- * @returns [edgeConnectivityPositions, edgeColors]
- *  edgeConnectivityPositions: Float32Array of source position coordinates and destination  position coordinates
- *  edgeColors: Float32Array of RGBA values of edges
- */
-function makeAllEdges(pos, elavate) {
-    const nNodes = Object.keys(pos).length;
-    const edgePositions = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
-    const edgeColors = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
+        const node = nodeGroup.children[i];
+        node.position.set(nodePos[i][0], nodePos[i][1], 0);
+    }
+}
+
+// Returns edge position buffer from node position array
+function nodePos2edgePos(nodePosArr){
+    const nNodes = nodePosArr.length;
+    const edgePos = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
 
     for (let i = 0; i < nNodes ; i++) {
 
@@ -231,35 +245,34 @@ function makeAllEdges(pos, elavate) {
                 continue;
             }
             let k = i * nNodes + j;
-            let src = Object.keys(pos)[i];
-            let dst = Object.keys(pos)[j];
 
-            edgePositions[ 6 * k ] = pos[src][0]; 
-            edgePositions[ 6 * k + 1] = pos[src][1];
-            edgePositions[ 6 * k + 2] = elavate ? risk[src] : 0;
+            edgePos[ 6 * k ] = nodePosArr[i][0]; 
+            edgePos[ 6 * k + 1] = nodePosArr[i][1];
+            edgePos[ 6 * k + 2] = 0;
 
-            edgeColors[ 8 * k ] = (edges[i][j])** (1/3) * 255 ; 
-            edgeColors[ 8 * k + 1] = 0;
-            edgeColors[ 8 * k + 2] = 0;
-            edgeColors[ 8 * k + 3] = (edges[i][j]) ** (3) * 255;
+            edgePos[ 6 * k + 3] = nodePosArr[j][0]; 
+            edgePos[ 6 * k + 4]  = nodePosArr[j][1];
+            edgePos[ 6 * k + 5]  = 0;
 
-            edgePositions[ 6 * k + 3] = pos[dst][0]; 
-            edgePositions[ 6 * k + 4]  = pos[dst][1];
-            edgePositions[ 6 * k + 5]  = elavate ? risk[dst] : 0;
-
-            edgeColors[ 8 * k + 4] = edgeColors[ 8 * k ]; 
-            edgeColors[ 8 * k + 5] = edgeColors[ 8 * k + 1];
-            edgeColors[ 8 * k + 6] = edgeColors[ 8 * k + 2];
-            edgeColors[ 8 * k + 7] = edgeColors[ 8 * k + 3];
         }
     }
-    return [edgePositions, edgeColors];
+    return edgePos;
 }
+
 
 
 function animate() {
     
-    const time = Date.now() * 0.001;    
+    const time = Date.now() * 0.001; 
+    
+    if (effectController.activateForce){
+        if ( counter % nFrame == 0) {
+            nodePos = moveNodes(nodePos, stepSize, 2.3);
+            //stepSize = (stepSize > dt) ? stepSize - dt : 0;
+            
+        }
+        counter += 1;
+    }
 
     renderer.clear();
 	renderer.render( scene, camera );
