@@ -11,14 +11,14 @@ import fragmentShader from '../../shaders/fragment.glsl.js'
 import {generateLegend} from '../legend/legendMaker.js';
 import {makeNodes, makeConnectivityEdges} from './graphMaker.js';
 import {singleStepForceDirected, scaleToBounds} from '../force/force-directed.js'
-import * as data from '../../saves/net_data_medium2.json' assert {type: 'json'}; // 63
+import * as data from '../../saves/net_data_medium3.json' assert {type: 'json'}; // 63
 
 console.log(data);
 
 const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
 let camera, scene, renderer, stats;
-let entityGroup;
+let clusterGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
 let uiScene, orthoCamera;
@@ -56,22 +56,26 @@ const topologyMaterial = new THREE.LineBasicMaterial({
 // GUI
 const effectController = {
     showConnectivity: true,
-    colorWithRisks: true,
-    maxIter: 50,
+    colorWithRisks: false,
+    maxIter: 500,
     stepSize: .1,
     activateForce: false
 };
 
 // Read planar positions
-const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
-//let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
-const nNodes = Object.keys(pos).length;
+const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, clusAssignments, extras} = data
+const namesArr = Object.keys(pos);
+const nNodes = namesArr.length;
+const indDict = {};
+for (let i = 0; i < nNodes; i++) {
+    indDict[namesArr[i]] = i;
+}
 
 let nodePos = Array.from(Object.keys(pos), (key) => pos[key]); // Array of node positions sorted acc. to pos
 let stepSize = .01;
 let dt = stepSize / (effectController.maxIter + 1);
 
-const nFrame = 5;
+const nFrame = 2;
 let counter = 0;
 
 init();
@@ -87,24 +91,28 @@ function initGUI(){
     } );
 
     gui.add( effectController, 'colorWithRisks' ).onChange( function ( value ) {
+        
+        
+        for ( let j = 0; j < clusterGroup.children.length; j++ ) {
 
-        if (value == true) {
-            for ( let i = 0; i < nNodes; i ++ ) {
+            const cluster = clusterGroup.children[j];
+            
 
-                let name = Object.keys(pos)[i];
-                let node = entityGroup.children[i];
+            for ( let i = 0; i < cluster.children.length; i++ ) {
 
-                node.material.color.setRGB( risk_mean[name] / extras.diam_z , 0, 0);
+                const node = cluster.children[i];
+                const name = node.name;
+
+                if (value == true) {
+                    node.material.color.setRGB( risk_mean[name] / extras.diam_z , 0, 0);
+                } else {
+                    node.material.color.setRGB(entityColors[name][0], entityColors[name][1], entityColors[name][2]);
+                }
             
             }
-        } else {
-            for ( let i = 0; i < nNodes; i ++ ) {
-                let name = Object.keys(pos)[i];
-                let node = entityGroup.children[i];
-                node.material.color.setRGB(entityColors[name][0], entityColors[name][1], entityColors[name][2]);
-        
-            }
         }
+
+        
     } );
 
     gui.add( effectController, 'maxIter', 10, 100, 10).onChange( function ( value ){
@@ -170,9 +178,9 @@ function init(){
     
     // Nodes
 
-    entityGroup = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
-    scene.add( entityGroup );
-    
+    clusterGroup = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors,
+         clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
+    scene.add( clusterGroup );
     
     // Edges
     // Connectivity
@@ -183,8 +191,6 @@ function init(){
     edgeConnectivity.visible = effectController.showConnectivity;
     
 
-      
-    
 }
 
 
@@ -204,22 +210,90 @@ function onWindowResize() {
 
 }
 
-function moveNodes(nodePos, stepSize=null, diamXY=1.3){
-    
-    let nodePosArray2d = tf.tidy( () =>  singleStepForceDirected(funcEdges, nodePos, stepSize, diamXY));
-    const bounds = {upper:[2, 2], lower:[-2, -2]};
-    nodePosArray2d = tf.tidy( () =>  scaleToBounds(nodePosArray2d, bounds) );
-    // Cooling and convergence criteria right here
+//Mask the Array along axs given the boolean mask
+function maskArray(array, indices, axs=0) {
+    let tensor = tf.tensor(array);
+    tensor = tf.gather(tensor, indices, axs);
+    return tensor.arraySync();
+}
 
-    edgePos = nodePos2edgePos(nodePosArray2d);
-    edgeConnectivity.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
-    edgeConnectivity.geometry.attributes.position.needsUpdate = true;
-    //Topology edges?
+function maskArray2(array, indices, axs=0) {
+    
+    const res = [];
+    if (axs == 0) {
+        indices.forEach( (i) => res.push(array[i]))
+    } else if (axs == 1) {
+        array.forEach( (row) => res.push( maskArray2(row, indices, 0) ) ) ;
+    }
+    return res;
+}
+
+// Move the nodes only within the cluster. TODO: Need to move to more robust datatype/table for sending data from py end
+function moveWithinCluster(clusterGroup, allPosArr, allEdgeWeights, clusAssignments, stepSize=null, diamXY=1.3){
+    
+    const nClus = clusterGroup.children.length;
+
+    for (let j = 0; j < nClus; j++){
+        const cluster = clusterGroup.children[j];
+        
+        // Form Mask
+        const jClusIndices = [];
+        for (let i = 0; i < cluster.children.length; i++){
+
+            const name = cluster.children[i].name;
+
+            if (clusAssignments[name] == j){
+                jClusIndices.push(indDict[name]);
+            }
+        }
+
+        // Compute masked pos and weights
+        let clusPosArr =  tf.tidy( () => maskArray2(allPosArr, jClusIndices));
+        const clusEdgeWeights =  tf.tidy( () => maskArray2( maskArray2(allEdgeWeights, jClusIndices, 0), jClusIndices, 1) );        
+        
+        //console.log(clusPosArr)
+
+        clusPosArr = moveNodes(cluster, clusPosArr, clusEdgeWeights, stepSize, diamXY / nClus, false);
+        
+        for (let k = 0; k < jClusIndices.length; k++){
+            allPosArr[ jClusIndices[k]] = clusPosArr[k];
+        }
+        
+    }
+
+    
+    return allPosArr;
+
+}
+
+/**
+ * Move the entities within a Group according to forces
+ * @param {*} entityGroup Group of entities to be moves one step
+ * @param {*} nodePos Array of node positions sorted according to the Group order
+ * @param {*} edgeWeights Matrix of edge weights sorted wrt. the group order
+ * @param {*} stepSize Expected step size of displacement
+ * @param {*} diamXY Diameter of the node distribution (max - min)
+ * @returns New array of node positions wrt. the group order
+ */
+function moveNodes(entityGroup, nodePos, edgeWeights, stepSize=null, diamXY=1.3, scale=true){
+    
+    let nodePosArray2d = tf.tidy( () =>  singleStepForceDirected(edgeWeights, nodePos, stepSize, diamXY));
+    const bounds = {upper:[2, 2], lower:[-2, -2]};
+    if ( scale) {
+        nodePosArray2d = tf.tidy( () =>  scaleToBounds(nodePosArray2d, bounds) );
+    }
+    // Cooling and convergence criteria right here
 
     setNodePos(entityGroup, nodePosArray2d);
     //console.log(tf.memory());
 
     return nodePosArray2d;
+}
+
+function setEdgePosFromNodePos(nodePos) {
+    edgePos = nodePos2edgePos(nodePos);
+    edgeConnectivity.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
+    edgeConnectivity.geometry.attributes.position.needsUpdate = true;
 }
 
 // Sets the node positions according to the new node position array
@@ -267,8 +341,12 @@ function animate() {
     
     if (effectController.activateForce){
         if ( counter % nFrame == 0) {
-            nodePos = moveNodes(nodePos, stepSize, 2.3);
-            //stepSize = (stepSize > dt) ? stepSize - dt : 0;
+
+            nodePos = moveWithinCluster(clusterGroup, nodePos, funcEdges, clusAssignments, stepSize, 2.3);
+            setEdgePosFromNodePos(nodePos);
+            //Topology edges?
+            
+            stepSize = (stepSize > dt) ? stepSize - dt : 0;
             
         }
         counter += 1;

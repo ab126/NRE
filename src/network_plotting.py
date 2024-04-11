@@ -273,6 +273,7 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
     """Computes the "Pie Layout" for the network given by mat_f"""
 
     gr, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
+    clus_assgn = {node: int(i) for node, i in zip(gr.nodes, new_labels)}
 
     phi = 2 * np.pi / (n_cluster - 1)  # Constant angle of pie given for each cluster
     r = r_const * d_xy / phi
@@ -313,9 +314,9 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
         widths = [gt[u][v]['weight'] for u, v in gt.edges]
         nx.draw(gt, pos_pie, with_labels=with_labels, width=widths, ax=ax, node_color=node_colors)
     if risk_mean is None:
-        return pos_pie, node_colors, r, gt
+        return pos_pie, node_colors, r, gt, clus_assgn
     else:
-        return pos_pie, risk_mean, risk_cov, node_colors, r, gt
+        return pos_pie, risk_mean, risk_cov, node_colors, r, gt, clus_assgn
 
 
 # --------------------------------------------------------------------------------
@@ -514,11 +515,13 @@ def risk_elevation_layout(
                     mat_d[i, j] = dists[i][1][list(g.nodes)[j]]
 
             pos = _david_force_directed(
-                mat_a, mat_d, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations, threshold=threshold,
+                mat_a, mat_d, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations,
+                threshold=threshold,
                 dim=dim, seed=seed, beta=beta)
         elif method == 'fuchterman-reingold' or method is None:  # None
             pos = _modified_fruchterman_reingold(
-                mat_a, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations, threshold=threshold,
+                mat_a, risks=risks, alpha=alpha, k=k, pos=pos_arr, fixed=fixed, iterations=iterations,
+                threshold=threshold,
                 dim=dim, seed=seed)
         else:
             raise NotImplementedError("Method {} not implemented".format(method))
@@ -602,7 +605,8 @@ def _modified_fruchterman_reingold(
 
 
 def _david_force_directed(
-        mat_a, mat_d, risks=None, alpha=0.2, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, dim=2, seed=None,
+        mat_a, mat_d, risks=None, alpha=0.2, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, dim=2,
+        seed=None,
         beta=1):
     # Position nodes in adjacency matrix A using a force directed algorithm
 
@@ -654,8 +658,8 @@ def _david_force_directed(
         np.clip(distance, 0.01, None, out=distance)
         # displacement "force"
         displacement = np.einsum(
-            "ijk,ij->ik", delta, (beta * mat_d * (k/ distance) - mat_a * distance / k)
-            #"ijk,ij->ik", delta, (beta * mat_d * (k ** 2) / distance ** 2 - mat_a * distance / k)
+            "ijk,ij->ik", delta, (beta * mat_d * (k / distance) - mat_a * distance / k)
+            # "ijk,ij->ik", delta, (beta * mat_d * (k ** 2) / distance ** 2 - mat_a * distance / k)
         )  # TODO: Seems like its force times distance of each other node
         displacement[:, 1] += alpha * risks  # Modification due to risk elevation
 
@@ -686,4 +690,3 @@ def get_layout_tree(g_connectivity, pos):
                 continue
             g_layout.add_edge(u, v, weight=np.linalg.norm(pos[u] - pos[v]))
     return nx.minimum_spanning_tree(g_layout)
-
