@@ -181,7 +181,7 @@ function init(){
     clusterGroup = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors,
          clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( clusterGroup );
-    
+
     // Edges
     // Connectivity
 
@@ -208,6 +208,54 @@ function onWindowResize() {
 
     renderer.setSize( window.innerWidth, window.innerHeight );
 
+}
+
+// Compute the Cluster Related parameters ahead of time to reduce overhead
+function computeClusterParams(clusterGroup, allEdgeWeights, clusAssignments){
+
+    const nClus = clusterGroup.children.length;
+    const clusEdges = [];
+    const clusMemberships = [];
+
+    for (let j = 0; j < nClus; j++){
+        const cluster = clusterGroup.children[j];
+
+        // Form Masks
+        const temp = [];
+        for (let i = 0; i < cluster.children.length; i++){
+
+            const name = cluster.children[i].name;
+            
+            if (clusAssignments[name] == j){
+                temp.push(indDict[name]);
+            }
+        }
+        clusMemberships.push(temp);
+
+        // Calculated weighted mass divided edge weights
+
+        //const clusEdgeWeights =  maskArray2( maskArray2(allEdgeWeights, temp, 0), temp, 1);
+
+        
+        //clusEdges.push(clusEdgeWeights)
+
+    }
+
+    return [clusMemberships, clusEdges];
+
+}
+
+function moveClusters(clusterGroup, jClusIndices) {
+
+    const nClus = clusterGroup.children.length;
+
+    for (let j = 0; j < nClus; j++){
+        const cluster = clusterGroup.children[j];
+
+        // Move the group
+        clusterGroup.children[j].position.add( new THREE.Vector3(.1, .1, .1) ) 
+        console.log(clusterGroup.children[j].position)
+    }
 }
 
 //Mask the Array along axs given the boolean mask
@@ -345,6 +393,9 @@ function animate() {
             nodePos = moveWithinCluster(clusterGroup, nodePos, funcEdges, clusAssignments, stepSize, 2.3);
             setEdgePosFromNodePos(nodePos);
             //Topology edges?
+            
+            
+            
             
             stepSize = (stepSize > dt) ? stepSize - dt : 0;
             
