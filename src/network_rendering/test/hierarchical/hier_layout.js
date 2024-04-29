@@ -11,7 +11,7 @@ import fragmentShader from '../../shaders/fragment.glsl.js'
 import {generateLegend} from '../legend/legendMaker.js';
 import {makeNodes, makeConnectivityEdges} from './graphMaker.js';
 import {singleStepForceDirected, scaleToBounds} from '../force/force-directed.js'
-import * as data from '../../saves/net_data_medium3.json' assert {type: 'json'}; // 63
+import * as data from '../../saves/net_data_small.json' assert {type: 'json'}; // 63
 
 console.log(data);
 
@@ -30,7 +30,7 @@ const defHeight = 500;
 // Node & Edge Parameters
 const sizeMult = .5;
 const entityGeometry = new THREE.OctahedronGeometry( 0.05, 4 ); // 0.1, 4
-const routerGeometry = new THREE.OctahedronGeometry( 0.055, 0 ); // 0.11, 0
+const routerGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.08); //0.08
 const nodeMaterial = new THREE.MeshPhongMaterial({
     color:'#000000',
     emissive:'#000000',
@@ -181,6 +181,7 @@ function init(){
     clusterGroup = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors,
          clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( clusterGroup );
+    console.log(clusterGroup)
 
     // Edges
     // Connectivity
