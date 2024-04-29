@@ -451,8 +451,8 @@ def append_fig_to_frames(fig, frames=None, k=0, save_place='GIF_Images'):
     return frames
 
 
-def save_gif(save_name, frames, dur=400, loop=0):
+def save_gif(save_name, frames, dur=400, loop=0, format='GIF'):
     """Saves the gif from frames to save_name"""
     frame_one = frames[0]
-    frame_one.save(save_name, format="GIF", append_images=frames,
+    frame_one.save(save_name, format=format, append_images=frames,
                    save_all=True, duration=dur, loop=loop)

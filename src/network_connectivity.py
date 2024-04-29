@@ -1,5 +1,6 @@
 import copy
 
+import matplotlib
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,25 +19,26 @@ from src.archive.bbn_functions import get_DAG_from_model
 MIN_SAMPLES = 5  # Minimum number of samples required for MI calculation
 
 cic_conn_param_specs = {
-    'Port Num': {'method': 'last', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
-    'Protocol': {'method': 'last', 'src_feature_col': ' Protocol', 'dst_feature_col': ' Protocol'},
+    'Activation': {'method': 'activation'},
+    'Active Time': {'method': 'average', 'src_feature_col': 'Active Mean', 'dst_feature_col': 'Active Mean'},
+    'Flow Duration': {'method': 'total', 'src_feature_col': ' Flow Duration', 'dst_feature_col': ' Flow Duration'},
+    'Flow Speed': {'method': 'average', 'src_feature_col': 'Flow Bytes/s', 'dst_feature_col': 'Flow Bytes/s'},
+    'Header Length': {'method': 'average', 'src_feature_col': ' Fwd Header Length',
+                      'dst_feature_col': ' Bwd Header Length'},
+    'Idle Time': {'method': 'average', 'src_feature_col': 'Idle Mean', 'dst_feature_col': 'Idle Mean'},
+    'Num Active Packets': {'method': 'total', 'src_feature_col': ' act_data_pkt_fwd',
+                           'dst_feature_col': ' act_data_pkt_fwd'},
     'NPS': {'method': 'total', 'src_feature_col': ' Total Fwd Packets',
             'dst_feature_col': ' Total Backward Packets'},  # Number of Packets Sent
     'NPR': {'method': 'total', 'src_feature_col': ' Total Backward Packets',
             'dst_feature_col': ' Total Fwd Packets'},  # Number of Packets Received
+    'Packet Delay': {'method': 'average', 'src_feature_col': ' Fwd IAT Mean', 'dst_feature_col': ' Bwd IAT Mean'},
     'Packet Length': {'method': 'average', 'src_feature_col': ' Fwd Packet Length Mean',
                       'dst_feature_col': ' Bwd Packet Length Mean'},
-    'Flow Duration': {'method': 'total', 'src_feature_col': ' Flow Duration', 'dst_feature_col': ' Flow Duration'},
-    'Flow Speed': {'method': 'average', 'src_feature_col': 'Flow Bytes/s', 'dst_feature_col': 'Flow Bytes/s'},
-    'Response Time': {'method': 'average', 'src_feature_col': ' Bwd IAT Mean', 'dst_feature_col': ' Fwd IAT Mean'},
-    'Packet Delay': {'method': 'average', 'src_feature_col': ' Fwd IAT Mean', 'dst_feature_col': ' Bwd IAT Mean'},
-    'Header Length': {'method': 'average', 'src_feature_col': ' Fwd Header Length',
-                      'dst_feature_col': ' Bwd Header Length'},
-    'Num Active Packets': {'method': 'total', 'src_feature_col': ' act_data_pkt_fwd',
-                           'dst_feature_col': ' act_data_pkt_fwd'},
-    'Active Time': {'method': 'average', 'src_feature_col': 'Active Mean', 'dst_feature_col': 'Active Mean'},
-    'Idle Time': {'method': 'average', 'src_feature_col': 'Idle Mean', 'dst_feature_col': 'Idle Mean'},
-    'Activation': {'method': 'activation'}
+    'Port Num': {'method': 'last', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
+    'Protocol': {'method': 'last', 'src_feature_col': ' Protocol', 'dst_feature_col': ' Protocol'},
+    'Response Time': {'method': 'average', 'src_feature_col': ' Bwd IAT Mean', 'dst_feature_col': ' Fwd IAT Mean'}
+
 }
 
 
@@ -365,18 +367,26 @@ class ConnectivityUnit:
         """ Removes the samples after processing"""
         self.samples = np.array([[]])
 
-    def plot_f(self, labels=True, cbar_font_size=16):
+    def plot_f(self, labels=True, cbar_font_size=16, ax_label='Entity Index', show=True):
         """Plots the Adjacency matrix of the graph"""
         plt.matshow(self.mat_f, cmap='Blues')
-        cbar = plt.colorbar()
+
+        norm_cbar = matplotlib.colors.Normalize(vmin=0, vmax=1)
+        cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm_cbar, cmap='Blues'), ax=plt.gca())
+
+        # cbar = plt.colorbar()
         cbar.ax.tick_params(labelsize=cbar_font_size)
         if labels:
             plt.title(r'$\mathbf{F}^{(t)}$', fontsize=20)
-            plt.xlabel('Entity Index', weight='bold', fontsize=16)
-            plt.ylabel('Entity Index', weight='bold', fontsize=16)
+            plt.xlabel(ax_label, weight='bold', fontsize=16)
+            plt.ylabel(ax_label, weight='bold', fontsize=16)
             ax = plt.gca()
             ax.xaxis.set_ticks_position('bottom')
-        plt.show()
+        if show:
+            plt.show()
+        fig = plt.gcf()
+        plt.close()
+        return fig
 
     # Partitioning Related Methods
     def remove_infrequent(self, thr=1000):
