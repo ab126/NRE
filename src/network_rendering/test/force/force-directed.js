@@ -45,7 +45,8 @@ export function singleStepForceDirected(funcAdj, nodePos = null, t = null, diamX
 
     //Update
     let length = tf.norm(displacement, undefined, 1);
-    length = length.clipByValue(minDist, length.max().arraySync());
+    //length = length.clipByValue(minDist, length.max().arraySync());
+    
     //const deltaPos = tf.einsum("ij,i->ij", displacement, tf.tensor([t]).div(length) ); // Scale the displacement
     const deltaPos = displacement.mul(t / length.max().arraySync());
     nodePosTensor = nodePosTensor.add(deltaPos);

@@ -11,14 +11,14 @@ import fragmentShader from '../../shaders/fragment.glsl.js'
 import {generateLegend} from '../legend/legendMaker.js';
 import {makeNodes, makeConnectivityEdges} from './graphMaker.js';
 import {singleStepForceDirected, scaleToBounds} from '../force/force-directed.js'
-import * as data from '../../saves/net_data_small.json' assert {type: 'json'}; // 63
+import * as data from '../../saves/net_data_medium3.json' assert {type: 'json'}; // 63
 
 console.log(data);
 
 const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
 let camera, scene, renderer, stats;
-let clusterGroup;
+let clusterGroup, clusMemberships, clusEdges;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
 let uiScene, orthoCamera;
@@ -59,6 +59,8 @@ const effectController = {
     colorWithRisks: false,
     maxIter: 500,
     stepSize: .1,
+    moveClusCenters: true,
+    moveInterCluster: true,
     activateForce: false
 };
 
@@ -66,12 +68,12 @@ const effectController = {
 const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, clusAssignments, extras} = data
 const namesArr = Object.keys(pos);
 const nNodes = namesArr.length;
-const indDict = {};
+const indDict = {}; // Dictionary of {name:index}
 for (let i = 0; i < nNodes; i++) {
     indDict[namesArr[i]] = i;
 }
 
-let nodePos = Array.from(Object.keys(pos), (key) => pos[key]); // Array of node positions sorted acc. to pos
+let allNodePos = Array.from(Object.keys(pos), (key) => pos[key]); // Array of node positions sorted acc. to pos
 let stepSize = .01;
 let dt = stepSize / (effectController.maxIter + 1);
 
@@ -123,6 +125,10 @@ function initGUI(){
        stepSize=value;
     } );
 
+    gui.add( effectController, 'moveClusCenters' );
+
+    gui.add( effectController, 'moveInterCluster' );
+
     gui.add( effectController, 'activateForce' );
 }
 
@@ -154,7 +160,7 @@ function init(){
     uiScene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
 
     //Plane
-    const planeGeometry = new THREE.PlaneGeometry( 8, 8 );
+    const planeGeometry = new THREE.PlaneGeometry( 16, 16 );
     const planeMaterial = new THREE.MeshStandardMaterial( { color: 0xa3a3a3 } )
     const plane = new THREE.Mesh( planeGeometry, planeMaterial );
     plane.position.z = -0.1;
@@ -191,7 +197,9 @@ function init(){
     scene.add( edgeConnectivity );
     edgeConnectivity.visible = effectController.showConnectivity;
     
-
+    // Cluster parameters
+    [clusMemberships, clusEdges] = computeClusterParams(clusterGroup, funcEdges, clusAssignments);
+    console.log(clusEdges)
 }
 
 
@@ -205,7 +213,6 @@ function onWindowResize() {
     orthoCamera.top = 1 * window.innerHeight / defHeight;
     orthoCamera.bottom = -1 * window.innerHeight / defHeight;
     orthoCamera.updateProjectionMatrix();
-    //console.log([window.innerWidth, window.innerHeight]);
 
     renderer.setSize( window.innerWidth, window.innerHeight );
 
@@ -215,48 +222,43 @@ function onWindowResize() {
 function computeClusterParams(clusterGroup, allEdgeWeights, clusAssignments){
 
     const nClus = clusterGroup.children.length;
-    const clusEdges = [];
     const clusMemberships = [];
-
+    
     for (let j = 0; j < nClus; j++){
         const cluster = clusterGroup.children[j];
-
-        // Form Masks
-        const temp = [];
-        for (let i = 0; i < cluster.children.length; i++){
-
-            const name = cluster.children[i].name;
-            
-            if (clusAssignments[name] == j){
-                temp.push(indDict[name]);
-            }
-        }
-        clusMemberships.push(temp);
-
-        // Calculated weighted mass divided edge weights
-
-        //const clusEdgeWeights =  maskArray2( maskArray2(allEdgeWeights, temp, 0), temp, 1);
-
         
-        //clusEdges.push(clusEdgeWeights)
+        // Form Mask
+        const jClusIndices = []; // Indices of the entities that belong to cluster j
+        for (let k = 0; k < cluster.children.length; k++){
 
+            const name = cluster.children[k].name;
+            if (clusAssignments[name] == j){
+                jClusIndices.push(indDict[name]);
+            } 
+        }
+        clusMemberships.push(jClusIndices);
+        
+    }
+
+    // Calculated weighted mass divided edge weights
+    const clusEdges = new Array(nClus).fill(0).map(() => new Array(nClus).fill(0));
+    for (let i = 0, src_clus, dst_clus, mass; i < nNodes; i ++) {
+
+        for (let j = 0; j < nNodes; j ++ ) {
+            if (i == j) {
+                continue
+            }
+
+            src_clus = clusAssignments[Object.keys(pos)[i]];
+            dst_clus = clusAssignments[Object.keys(pos)[j]];
+            mass = clusterGroup.children[dst_clus].children.length;
+
+            clusEdges[src_clus][dst_clus] += allEdgeWeights[i][j] / mass;
+        }
     }
 
     return [clusMemberships, clusEdges];
 
-}
-
-function moveClusters(clusterGroup, jClusIndices) {
-
-    const nClus = clusterGroup.children.length;
-
-    for (let j = 0; j < nClus; j++){
-        const cluster = clusterGroup.children[j];
-
-        // Move the group
-        clusterGroup.children[j].position.add( new THREE.Vector3(.1, .1, .1) ) 
-        console.log(clusterGroup.children[j].position)
-    }
 }
 
 //Mask the Array along axs given the boolean mask
@@ -278,45 +280,63 @@ function maskArray2(array, indices, axs=0) {
 }
 
 // Move the nodes only within the cluster. TODO: Need to move to more robust datatype/table for sending data from py end
-function moveWithinCluster(clusterGroup, allPosArr, allEdgeWeights, clusAssignments, stepSize=null, diamXY=1.3){
+function moveWithinCluster(clusterGroup, allPosArr, allEdgeWeights, clusMemberships, stepSize=null, diamXY=1.3){
     
     const nClus = clusterGroup.children.length;
 
     for (let j = 0; j < nClus; j++){
         const cluster = clusterGroup.children[j];
         
-        // Form Mask
-        const jClusIndices = [];
-        for (let i = 0; i < cluster.children.length; i++){
-
-            const name = cluster.children[i].name;
-
-            if (clusAssignments[name] == j){
-                jClusIndices.push(indDict[name]);
-            }
-        }
-
-        // Compute masked pos and weights
+        // Compute masked pos and weights for jth cluster
+        const jClusIndices = clusMemberships[j];
         let clusPosArr =  tf.tidy( () => maskArray2(allPosArr, jClusIndices));
         const clusEdgeWeights =  tf.tidy( () => maskArray2( maskArray2(allEdgeWeights, jClusIndices, 0), jClusIndices, 1) );        
         
-        //console.log(clusPosArr)
 
-        clusPosArr = moveNodes(cluster, clusPosArr, clusEdgeWeights, stepSize, diamXY / nClus, false);
-        
+        clusPosArr = calcMove(clusPosArr, clusEdgeWeights, stepSize, diamXY / nClus, false);
+        setNodePos(cluster, clusPosArr);
+
         for (let k = 0; k < jClusIndices.length; k++){
             allPosArr[ jClusIndices[k]] = clusPosArr[k];
         }
         
     }
-
     
     return allPosArr;
 
 }
 
+// Move the center of the clusters wrt each other
+function moveClusters(entityClusters, allPosArr, allEdgeWeights, clusAssignments, clusMemberships, intraClusEdges, stepSize=null, diamXY=2.3){
+
+    const nClus = entityClusters.children.length;
+    // Form cluster center positions array
+    let clusCenters = Array.from(entityClusters.children, (clus) => [clus.position.x, clus.position.y]);
+    
+    // Move the cluster centers
+    clusCenters = calcMove( clusCenters, intraClusEdges, stepSize, diamXY, false);   
+    
+    const diff = new Array(nClus).fill(0).map(() => new Array(2).fill(0));
+    for (let j = 0, clus; j < nClus; j++) {
+        clus = entityClusters.children[j];
+        diff[j] = [clusCenters[j][0] - clus.position.x, clusCenters[j][1] - clus.position.y];
+        clus.position.set( clusCenters[j][0], clusCenters[j][1], 0);
+    }
+
+    // Update nodePos
+    for ( let i = 0, clusIndex; i < nNodes; i ++ ) {
+        clusIndex = clusAssignments[ Object.keys(pos)[i]];
+
+        allPosArr[i][0] += diff[clusIndex][0];
+        allPosArr[i][1] += diff[clusIndex][1];
+    }
+
+    return allPosArr
+}
+
+
 /**
- * Move the entities within a Group according to forces
+ * Calculate the move of entities within a Group according to forces
  * @param {*} entityGroup Group of entities to be moves one step
  * @param {*} nodePos Array of node positions sorted according to the Group order
  * @param {*} edgeWeights Matrix of edge weights sorted wrt. the group order
@@ -324,22 +344,21 @@ function moveWithinCluster(clusterGroup, allPosArr, allEdgeWeights, clusAssignme
  * @param {*} diamXY Diameter of the node distribution (max - min)
  * @returns New array of node positions wrt. the group order
  */
-function moveNodes(entityGroup, nodePos, edgeWeights, stepSize=null, diamXY=1.3, scale=true){
+function calcMove(nodePos, edgeWeights, stepSize=null, diamXY=1.3, scale=true){
     
     let nodePosArray2d = tf.tidy( () =>  singleStepForceDirected(edgeWeights, nodePos, stepSize, diamXY));
     const bounds = {upper:[2, 2], lower:[-2, -2]};
     if ( scale) {
         nodePosArray2d = tf.tidy( () =>  scaleToBounds(nodePosArray2d, bounds) );
     }
-    // Cooling and convergence criteria right here
+    // TODO: Cooling and convergence criteria right here
 
-    setNodePos(entityGroup, nodePosArray2d);
     //console.log(tf.memory());
 
     return nodePosArray2d;
 }
 
-function setEdgePosFromNodePos(nodePos) {
+function setEdgePosFromNodePos(edgeConnectivity, nodePos) {
     edgePos = nodePos2edgePos(nodePos);
     edgeConnectivity.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
     edgeConnectivity.geometry.attributes.position.needsUpdate = true;
@@ -348,10 +367,11 @@ function setEdgePosFromNodePos(nodePos) {
 // Sets the node positions according to the new node position array
 function setNodePos(nodeGroup, nodePos){
     const nNodes = nodeGroup.children.length;
+    const center = nodeGroup.position.clone();
     for ( let i = 0; i < nNodes; i ++ ) {
 
         const node = nodeGroup.children[i];
-        node.position.set(nodePos[i][0], nodePos[i][1], 0);
+        node.position.set(nodePos[i][0] - center.x, nodePos[i][1] - center.y, 0);
     }
 }
 
@@ -391,12 +411,14 @@ function animate() {
     if (effectController.activateForce){
         if ( counter % nFrame == 0) {
 
-            nodePos = moveWithinCluster(clusterGroup, nodePos, funcEdges, clusAssignments, stepSize, 2.3);
-            setEdgePosFromNodePos(nodePos);
+            if (effectController.moveInterCluster) {
+                allNodePos = moveWithinCluster(clusterGroup, allNodePos, funcEdges, clusMemberships, stepSize, 1.3); // 2.3
+            }
+            if (effectController.moveClusCenters) {
+                allNodePos = moveClusters(clusterGroup, allNodePos, funcEdges, clusAssignments, clusMemberships, clusEdges, stepSize/2, 2.3)
+            }
+            setEdgePosFromNodePos(edgeConnectivity, allNodePos);
             //Topology edges?
-            
-            
-            
             
             stepSize = (stepSize > dt) ? stepSize - dt : 0;
             
