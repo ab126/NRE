@@ -275,7 +275,7 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
     gr, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
     clus_assgn = {node: int(i) for node, i in zip(gr.nodes, new_labels)}
 
-    phi = 2 * np.pi / (n_cluster - 1)  # Constant angle of pie given for each cluster
+    phi = 2 * np.pi / (n_cluster - 1) if n_cluster > 1 else 2 * np.pi # Constant angle of pie given for each cluster
     r = r_const * d_xy / phi
     scale_cluster = 0.8
     cmap = plt.get_cmap('cool')
@@ -308,7 +308,7 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
                 pos_pie[node] = np.array(polar2cartesian(r + y, np.pi / 2 - (x / d_xy * phi + theta_i), units='rad'))
             node_colors.append(cmap(i / n_cluster))
 
-    gt = gr.subgraph(list(pos_pie.keys()))
+    gt = gr.subgraph(list(pos_pie.keys())) # Reordering nodes due to layout
     if plot_bool:
         fig, ax = plt.subplots(figsize=(10, 6))
         widths = [gt[u][v]['weight'] for u, v in gt.edges]
@@ -512,6 +512,7 @@ def risk_elevation_layout(
             for i in range(nnodes):
                 for j in range(nnodes):
                     assert dists[i][0] == list(g.nodes)[i], "Order of nodes due to nx.shortest_path_length is altered"
+                    #print(dists)
                     mat_d[i, j] = dists[i][1][list(g.nodes)[j]]
 
             pos = _david_force_directed(

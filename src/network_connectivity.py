@@ -49,8 +49,11 @@ class ConnectivityUnit:
         Main methods are read flow data, fit the connectivity model to it and estimate risks.
     """
 
+    # TODO: Make it serializable by adding __dict__ method
+
     def __init__(self, loss_thr=9999, mat_x_init=None, mat_p_init=None, mat_q=None):
 
+        self.g = nx.empty_graph()
         self.conn_params = ['Activation', 'Num Packets Sent', 'Num Packets Rec', 'Packet Length',
                             'Flow Duration', 'Flow Speed', 'Response Time', 'Packet Delay', 'Header Length',
                             'Num Active Packets', 'Active Time', 'Idle Time']
@@ -458,6 +461,36 @@ class ConnectivityUnit:
                                                     normalize=False)
         self.mat_r = mat_r
 
+    # nx Graph Functions
+    def fit_nx_graph(self):
+        """ Return the nx graph from mat_f and entity_names """
+        self.g = nx.from_numpy_array(self.mat_f - np.diag(np.diag(self.mat_f)))
+        nx.relabel_nodes(self.g, {i: name for i, name in enumerate(self.names)}, copy=False)
+
+    def get_connected_units(self):
+        """ Returns the connected components from mat_f as sub connectivity units. List order is from largest to
+        smallest"""
+        if len(self.g) == 0:
+            self.fit_nx_graph()
+        gcc = sorted(nx.connected_components(self.g), key=len, reverse=True)
+
+        sub_units = []
+        for sub_names in gcc:
+
+            # Form new units
+            ind = np.array([i for i in range(len(self.names)) if self.names[i] in sub_names])
+
+            sub_cu = ConnectivityUnit()
+            sub_cu.samples = self.samples[ind].copy()
+            sub_cu.names = list(np.array(self.names)[ind])
+            sub_cu.num_appearances = self.num_appearances[ind].copy()
+
+            sub_cu.mat_f = self.mat_f[ind,:][:, ind].copy()
+            sub_cu.g = self.g.subgraph(sub_names)
+            sub_units.append(sub_cu)
+
+        return sub_units
+
 
 def get_all_entities(df, src_id_col=' Source IP', dst_id_col=' Destination IP'):
     """
@@ -681,20 +714,3 @@ def apply_partitioning(cu, n_clus, plot_bool=True, fontsize=24, seed=5):
         sub_units.append(copy.deepcopy(curr_unit))
     return sub_units
 
-
-def get_connected_components(cu_main):
-    """ Returns the Connectivity units for the connected components of the main_unit. Return from largest to smallest"""
-    g_f = nx.from_numpy_array(cu_main.mat_f - np.diag(np.diag(cu_main.mat_f)))
-    nx.relabel_nodes(g_f, {i: name for i, name in enumerate(cu_main.names)}, copy=False)
-
-    gcc = sorted(nx.connected_components(g_f), key=len, reverse=True) # connected components
-
-    sub_units = []
-    for nodes_set in gcc:
-        curr_names = list(nodes_set)
-
-        curr_unit = copy.deepcopy(cu_main)
-        remove_names = [name for name in cu_main.names if name not in curr_names]
-        curr_unit.remove_entities(remove_names)
-        sub_units.append(copy.deepcopy(curr_unit))
-    return sub_units

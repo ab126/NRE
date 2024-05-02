@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import * as tf from '@tensorflow/tfjs';
+
+const color1 = new THREE.Color(44, 246, 4);
+const color2 = new THREE.Color(246, 4, 4);
 
 // Makes and returns the entity Group
 export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_mean, entityColors, clusAssignment, extras, sizeMult=.5, colorWithRisks=true){
@@ -18,15 +22,18 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
         clusCenters.push( new THREE.Vector3(0, 0, 0));
     }
 
-    for ( let i = 0, entityName; i < nEntities; i++ ) {
+    for ( let i = 0, clr, t, entityName; i < nEntities; i++ ) {
         entityName = Object.keys(pos)[i];
 
         nodePosArray[i] = pos[entityName];
         degrees[i] = funcEdges[i].reduce((acc, val) => acc + val );
 
-        nodeColors[ i * 4 ] = colorWithRisks ? risk_mean[entityName] / extras.diam_z : entityColors[entityName][0];
-        nodeColors[ i * 4 + 1] = colorWithRisks ? 0 : entityColors[entityName][1];
-        nodeColors[ i * 4 + 2] = colorWithRisks ? 0 : entityColors[entityName][2];
+        t = risk_mean[entityName] / extras.diam_z > 0 ? risk_mean[entityName] / extras.diam_z: 0;
+        clr = colormapLinear(color1, color2, t);
+
+        nodeColors[ i * 4 ] = colorWithRisks ? clr.r / 256 : entityColors[entityName][0];
+        nodeColors[ i * 4 + 1] = colorWithRisks ? clr.g / 256 : entityColors[entityName][1];
+        nodeColors[ i * 4 + 2] = colorWithRisks ? clr.b / 256 : entityColors[entityName][2];
         nodeColors[ i * 4 + 3] = colorWithRisks ? 1 : entityColors[entityName][3];
 
     }
@@ -109,7 +116,7 @@ export function makeConnectivityEdges(edgeConnectivityMaterial, pos, funcEdges, 
  *  edgeConnectivityPositions: Float32Array of source position coordinates and destination  position coordinates
  *  edgeColors: Float32Array of RGBA values of edges
  */
-function makeAllEdges(pos, edges, risk, elavate) {
+export function makeAllEdges(pos, edges, risk, elavate) {
     const nNodes = Object.keys(pos).length;
     const edgePositions = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
     const edgeColors = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
@@ -147,5 +154,114 @@ function makeAllEdges(pos, edges, risk, elavate) {
     return [edgePositions, edgeColors];
 }
 
+// For altering Positions
+
+// Sets the node positions according to the new node position array
+export function setNodePos(nodeGroup, nodePos){
+    const nNodes = nodeGroup.children.length;
+    const center = nodeGroup.position.clone();
+    for ( let i = 0; i < nNodes; i ++ ) {
+
+        const node = nodeGroup.children[i];
+        node.position.set(nodePos[i][0] - center.x, nodePos[i][1] - center.y, 0);
+    }
+}
+
+// Get the edge positions from node positions
+export function setEdgePosFromNodePos(edgeConnectivity, nodePos) {
+    const edgePos = nodePos2edgePos(nodePos);
+    edgeConnectivity.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
+    edgeConnectivity.geometry.attributes.position.needsUpdate = true;
+}
+
+// Returns edge position buffer from node position array
+export function nodePos2edgePos(nodePosArr){
+    const nNodes = nodePosArr.length;
+    const edgePos = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
+
+    for (let i = 0; i < nNodes ; i++) {
+
+        for (let j = 0; j < nNodes ; j++) {
+
+            if (j == i){
+                continue;
+            }
+            let k = i * nNodes + j;
+
+            edgePos[ 6 * k ] = nodePosArr[i][0]; 
+            edgePos[ 6 * k + 1] = nodePosArr[i][1];
+            edgePos[ 6 * k + 2] = 0;
+
+            edgePos[ 6 * k + 3] = nodePosArr[j][0]; 
+            edgePos[ 6 * k + 4]  = nodePosArr[j][1];
+            edgePos[ 6 * k + 5]  = 0;
+
+        }
+    }
+    return edgePos;
+}
+
+// Compute the Cluster Related parameters ahead of time to reduce overhead
+export function computeClusterParams(clusterGroup, allEdgeWeights, clusAssignments, indDict){
+
+    const nNodes = clusAssignments.length;
+    const nClus = clusterGroup.children.length;
+    const clusMemberships = [];
+    
+    for (let j = 0; j < nClus; j++){
+        const cluster = clusterGroup.children[j];
+        
+        // Form Mask
+        const jClusIndices = []; // Indices of the entities that belong to cluster j
+        for (let k = 0; k < cluster.children.length; k++){
+
+            const name = cluster.children[k].name;
+            if (clusAssignments[name] == j){
+                jClusIndices.push(indDict[name]);
+            } 
+        }
+        clusMemberships.push(jClusIndices);
+        
+    }
+
+    // Calculated weighted mass divided edge weights
+    const clusEdges = new Array(nClus).fill(0).map(() => new Array(nClus).fill(0));
+    for (let i = 0, src_clus, dst_clus, mass; i < nNodes; i ++) {
+
+        for (let j = 0; j < nNodes; j ++ ) {
+            if (i == j) {
+                continue
+            }
+
+            src_clus = clusAssignments[Object.keys(pos)[i]];
+            dst_clus = clusAssignments[Object.keys(pos)[j]];
+            mass = clusterGroup.children[dst_clus].children.length;
+
+            clusEdges[src_clus][dst_clus] += allEdgeWeights[i][j] / mass;
+        }
+    }
+
+    return [clusMemberships, clusEdges];
+
+}
 
 
+/**
+ * Linear Interpolation between color1 and color2
+ * @param {*} color1 THREE.Color :  Start color
+ * @param {*} color2 THREE.Color :  End color
+ * @param {*} t float : Interpolation parameter in [0, 1]
+ */
+function colormapLinear(color1, color2, t){
+
+    const p3 =  tf.tidy( () => colormapHelper(color1, color2, t));
+    return new THREE.Color(parseInt(p3[0]), parseInt(p3[1]), parseInt(p3[2]));
+
+    function colormapHelper(color1, color2, t){
+        const p1 = tf.tensor( [color1.r, color1.g, color1.b]);
+        const p2 = tf.tensor( [color2.r, color2.g, color2.b]);
+
+        return p1.add( p2.sub(p1).mul(t)).arraySync();
+    }
+    
+}

@@ -175,11 +175,12 @@ export function generateLegend(fontPath, entityGeometry, routerGeometry, nodeMat
     fm.addFont("Nomenclature", [ xPos4[0], yPos4[0] - textYShift, 0], liteMat, riskSegment); // -.09, -.14, 0
     fm.addFont("   [0,1]: 0 - low risk, 1 - high risk ", [ xPos4[0], yPos4[1] - textYShift, 0], liteMat, riskSegment, 0.025); 
     fm.addFont("   Transparancy: Strenght of Connectivity ", [ xPos4[0], yPos4[2] - textYShift, 0], liteMat, riskSegment, 0.025); 
-    fm.addFont("   Color: blue - low, red - high ", [ xPos4[0], yPos4[3] - textYShift, 0], liteMat, riskSegment, 0.025); 
+    fm.addFont("   Color: green - low, red - high ", [ xPos4[0], yPos4[3] - textYShift, 0], liteMat, riskSegment, 0.025); 
     fm.addFont("   Circle: Entity ", [ xPos4[0], yPos4[4] - textYShift, 0], liteMat, riskSegment, 0.025); 
     fm.addFont("   Arc: Connectivity ", [ xPos4[0], yPos4[5] - textYShift, 0], liteMat, riskSegment, 0.025); 
     fm.addFont("   Circle Size: Traffic Quantity", [ xPos4[0], yPos4[6] - textYShift, 0], liteMat, riskSegment, 0.025); 
     
+    //console.log(uiScene)
     return [uiScene, orthoCamera]
 
 }
