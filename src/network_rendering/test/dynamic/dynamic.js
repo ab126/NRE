@@ -12,6 +12,7 @@ import {generateLegend} from '../legend/legendMaker.js';
 import {makeNodes, makeConnectivityEdges, setNodePos, setEdgePosFromNodePos, computeClusterParams} from '../hierarchical/graphMaker.js';
 
 import {calcMove} from '../force/force-directed.js'
+import * as stomp from './stomp.js';
 import * as data from '../../saves/net_data_medium3.json' assert {type: 'json'}; // 63
 console.log(data);
 
@@ -81,8 +82,34 @@ const bounds = {upper:[2.5, 2.5], lower:[-2.5, -2.5]};
 const nFrame = 2;
 let counter = 0;
 
+// Message Queue
+
+var ws = new WebSocket('ws://127.0.0.1:15674/ws');
+
+
+ws.onopen = function() {
+    console.log('Connected to AMQP broker');
+    //ws.send('Hey')
+};
+
+ws.onmessage = function(event) {
+    console.log('Received message from AMQP broker: ' + event.data);
+};
+
+ws.onclose = function() {
+    console.log('Disconnected from AMQP broker');
+};
+
+console.log(ws)
+
+
+
+
+
 init();
 animate();
+
+
 
 function initGUI(){
     const gui = new GUI();

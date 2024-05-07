@@ -439,6 +439,12 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.2, re
     return tuple(out_vars)
 
 
+def stream_df_to_jsonstring(df, forget_factor=0.5, k_steps=1, relief_factor=0.2, return_cov=False, return_datetimes=False,
+                         timeit=False, **kwargs):
+    """ Returns the string encoding risk estimates and mat_f to be used in dynamic rendering """
+
+
+
 # Making GIF
 def append_fig_to_frames(fig, frames=None, k=0, save_place='GIF_Images'):
     """Appends figure to frames"""

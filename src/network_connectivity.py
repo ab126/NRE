@@ -77,8 +77,7 @@ class ConnectivityUnit:
 
     def read_flows(self, df, entity_names=None, window_type='time', date_col=' Timestamp', last_datetime=None,
                    sync_window_size=1.2, time_scale='sec', conn_size=50, src_id_col=' Source IP',
-                   dst_id_col=' Destination IP', conn_param=None,
-                   src_feature_col=' Total Fwd Packets',
+                   dst_id_col=' Destination IP', conn_param=None, src_feature_col=' Total Fwd Packets',
                    dst_feature_col=' Total Backward Packets', method='total'):
         """
         Read flows from the DataFrame, computes the samples for the respective connection parameter
@@ -155,7 +154,7 @@ class ConnectivityUnit:
                                             src_id_col=src_id_col, dst_id_col=dst_id_col)
 
                 if conn_param is None:
-                    pass
+                    #pass
                     _update_sample(temp, row, counts, s_ind, d_ind, src_feature_col, dst_feature_col, method=method)
                 else:
                     kwargs = self.conn_param_specs[conn_param]
