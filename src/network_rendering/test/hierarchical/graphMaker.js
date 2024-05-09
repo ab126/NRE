@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
 
-const color1 = new THREE.Color(44, 246, 4);
-const color2 = new THREE.Color(246, 4, 4);
+export const color1 = new THREE.Color(44, 246, 4);
+export const color2 = new THREE.Color(246, 4, 4);
 
 // Makes and returns the entity Group
 export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_mean, entityColors, clusAssignment, extras, sizeMult=.5, colorWithRisks=true){
@@ -40,6 +40,8 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
     const minDeg = Math.min(...degrees);
     const maxDeg = Math.max(...degrees);
     const nodeSizes = Array(nEntities);
+
+    
     
     // Compute Cluster Centers & nMembers
     for ( let i = 0, entityName; i < nEntities; i ++ ) {
@@ -252,7 +254,7 @@ export function computeClusterParams(clusterGroup, allEdgeWeights, clusAssignmen
  * @param {*} color2 THREE.Color :  End color
  * @param {*} t float : Interpolation parameter in [0, 1]
  */
-function colormapLinear(color1, color2, t){
+export function colormapLinear(color1, color2, t){
 
     const p3 =  tf.tidy( () => colormapHelper(color1, color2, t));
     return new THREE.Color(parseInt(p3[0]), parseInt(p3[1]), parseInt(p3[2]));

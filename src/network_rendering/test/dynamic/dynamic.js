@@ -9,11 +9,11 @@ import vertexShader from '../../shaders/vertex.glsl.js'
 import fragmentShader from '../../shaders/fragment.glsl.js'
 
 import {generateLegend} from '../legend/legendMaker.js';
-import {makeNodes, makeConnectivityEdges, setNodePos, setEdgePosFromNodePos, computeClusterParams} from '../hierarchical/graphMaker.js';
+import {makeNodes, makeConnectivityEdges, setNodePos, setEdgePosFromNodePos,
+    computeClusterParams, colormapLinear, color1, color2} from '../hierarchical/graphMaker.js';
 
 import {calcMove} from '../force/force-directed.js'
-import * as stomp from './stomp.js';
-import * as data from '../../saves/net_data_medium3.json' assert {type: 'json'}; // 63
+import * as data from '../../saves/net_data_medium1.json' assert {type: 'json'}; // 63
 console.log(data);
 
 const fontPath = 'fonts/helvetiker_regular.typeface.json';
@@ -22,6 +22,7 @@ let camera, scene, renderer, stats;
 let clusterGroup, clusMemberships, clusEdges;
 let edgeConnectivity, edgePos;
 let uiScene, orthoCamera;
+let ws;
 
 // Legend Parameters
 const defWidth = 900; 
@@ -61,11 +62,13 @@ const effectController = {
     maxIter: 1950,
     stepSize: .015,
     alpha: 3.35,
-    activateForce: true
+    activateForce: true,
+    Start: connectWebSocket,
+    End: disconnectWebSocket
 };
 
 // Read planar positions
-const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, clusAssignments, extras} = data
+let {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, clusAssignments, extras} = data
 const namesArr = Object.keys(pos);
 const nNodes = namesArr.length;
 const indDict = {}; // Dictionary of {name:index}
@@ -82,25 +85,9 @@ const bounds = {upper:[2.5, 2.5], lower:[-2.5, -2.5]};
 const nFrame = 2;
 let counter = 0;
 
-// Message Queue
-
-var ws = new WebSocket('ws://127.0.0.1:15674/ws');
 
 
-ws.onopen = function() {
-    console.log('Connected to AMQP broker');
-    //ws.send('Hey')
-};
 
-ws.onmessage = function(event) {
-    console.log('Received message from AMQP broker: ' + event.data);
-};
-
-ws.onclose = function() {
-    console.log('Disconnected from AMQP broker');
-};
-
-console.log(ws)
 
 
 
@@ -108,19 +95,61 @@ console.log(ws)
 
 init();
 animate();
+console.log(clusterGroup)
+
+// Message Queue
+function connectWebSocket(){
+    ws = new WebSocket('ws://127.0.0.1:15674/ws');
 
 
+    ws.onopen = function() {
+        console.log('Connected to AMQP broker');
+    };
+
+
+    ws.onmessage = function(event) {
+        console.log('Received message from AMQP broker');
+        let obj = JSON.parse(event.data);
+
+        funcEdges = obj.funcEdges;
+        risk_mean = obj.risk_mean;
+        risk_cov = obj.risk_cov;
+
+        console.log(risk_mean)
+
+        // Update Edges
+        updateEdgeColors(funcEdges, edgeConnectivity, nNodes)
+
+        // Update Nodes
+        updateNodeColors(risk_mean, clusterGroup, nNodes, effectController.colorWithRisks)
+        
+        stepSize = effectController.stepSize;
+
+    };
+
+    ws.onclose = function() {
+        console.log('Disconnected from AMQP broker');
+    };
+
+    console.log(ws);
+}
+
+function disconnectWebSocket() {
+    ws.close();
+}
 
 function initGUI(){
     const gui = new GUI();
 
-    gui.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
+    const basic = gui.addFolder('Basics');
+
+    basic.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
 
         edgeConnectivity.visible = value
 
     } );
 
-    gui.add( effectController, 'colorWithRisks' ).onChange( function ( value ) {
+    basic.add( effectController, 'colorWithRisks' ).onChange( function ( value ) {
         
         
         for ( let j = 0; j < clusterGroup.children.length; j++ ) {
@@ -145,21 +174,28 @@ function initGUI(){
         
     } );
 
-    gui.add( effectController, 'maxIter', 50, 1000, 10).onChange( function ( value ){
+    basic.add( effectController, 'maxIter', 50, 1000, 10).onChange( function ( value ){
         dt = stepSize / (value + 1);
     } );
 
-    gui.add( effectController, 'stepSize', .001, .03, .001).onChange( function ( value ){
+    basic.add( effectController, 'stepSize', .001, .03, .001).onChange( function ( value ){
        stepSize=value;
     } );
 
-    gui.add( effectController, 'alpha', .05, 5, .05).onChange( function ( value ){
+    basic.add( effectController, 'alpha', .05, 5, .05).onChange( function ( value ){
         alpha=value;
      } );
 
-    gui.add( effectController, 'activateForce' );
+    basic.add( effectController, 'activateForce' );
 
-    gui.close();
+    basic.close();
+
+    const loadData = gui.addFolder('Load Data');
+
+    loadData.add( effectController, 'Start' );
+
+    loadData.add( effectController, 'End' );
+
 }
 
 function init(){ 
@@ -246,6 +282,64 @@ function onWindowResize() {
     orthoCamera.updateProjectionMatrix();
 
     renderer.setSize( window.innerWidth, window.innerHeight );
+
+}
+
+function updateNodeColors(risk_mean, clusterGroup, nNodes, colorWithRisks){
+    
+    // Update Nodes
+    const nodeColors = new Float32Array( nNodes * 4 );
+
+    for (let i = 0, entityName, t, clr; i < nNodes ; i++) {
+        entityName = namesArr[i];
+
+        t = risk_mean[entityName] / extras.diam_z > 0 ? risk_mean[entityName] / extras.diam_z: 0;
+        clr = colormapLinear(color1, color2, t);
+
+        nodeColors[ i * 4 ] = colorWithRisks ? clr.r / 256 : entityColors[entityName][0];
+        nodeColors[ i * 4 + 1] = colorWithRisks ? clr.g / 256 : entityColors[entityName][1];
+        nodeColors[ i * 4 + 2] = colorWithRisks ? clr.b / 256 : entityColors[entityName][2];
+        nodeColors[ i * 4 + 3] = colorWithRisks ? 1 : entityColors[entityName][3];
+    }
+
+
+    for (let j=0; j < clusterGroup.children.length; j++) {
+        for (let k=0, i, entity; k < clusterGroup.children[j].children.length; k++){
+            
+            entity = clusterGroup.children[j].children[k];
+            i = indDict[entity.name];
+            entity.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
+        }
+    }
+}
+
+function updateEdgeColors(funcEdges, edgeConnectivity, nNodes){
+
+    const edgeColors = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
+    
+    for (let i = 0; i < nNodes ; i++) {
+
+        for (let j = 0; j < nNodes ; j++) {
+
+            if (j == i){
+                continue;
+            }
+            let k = i * nNodes + j;
+
+            edgeColors[ 8 * k ] = (funcEdges[i][j])** (1/3) * 255 ; 
+            edgeColors[ 8 * k + 1] = 0;
+            edgeColors[ 8 * k + 2] = 0;
+            edgeColors[ 8 * k + 3] = (funcEdges[i][j]) ** (3) * 255;
+
+            edgeColors[ 8 * k + 4] = edgeColors[ 8 * k ]; 
+            edgeColors[ 8 * k + 5] = edgeColors[ 8 * k + 1];
+            edgeColors[ 8 * k + 6] = edgeColors[ 8 * k + 2];
+            edgeColors[ 8 * k + 7] = edgeColors[ 8 * k + 3];
+        }
+    }
+    edgeConnectivity.geometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
+
+
 
 }
 

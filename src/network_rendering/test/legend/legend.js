@@ -179,7 +179,7 @@ function init(){
     
 
     const controls = new OrbitControls( camera, renderer.domElement );   
-    
+    console.log(controls)
 }
 
 function onWindowResize() {

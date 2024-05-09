@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.preprocess import preprocess_df
 from src.network_connectivity import ConnectivityUnit, single_risk_update
 
@@ -16,15 +18,17 @@ class NetworkModel:
         :param mat_p_init: Initial risk covariance matrix as 2d np.ndarray
         :param mat_q: System noise covariance matrix as 2d np.ndarray
         """
-        self.cu = None
+
         self.entity_names = entity_names
+        self.cu = ConnectivityUnit()
+        self.mat_f = np.eye(len(entity_names))
         self.mat_x = mat_x_init
         self.mat_p = mat_p_init
         self.mat_q = mat_q
 
     # TODO: Make compatible with lower level class ConnectivityUnit.update_new_tick
     def update_new_tick(self, df_conn, measurement=None, mat_h=None, mat_r=None, keep_unit=False, relief_factor=0.6,
-                        **kwargs):
+                        forget_factor=0.8, **kwargs):
         """
         Update the risk estimates according to previous estimate
 
@@ -34,6 +38,9 @@ class NetworkModel:
         :param mat_r: Measurement noise covariance matrix
         :param keep_unit: If true stores the latest ConnectivityUnit as self.cu
         :param relief_factor: Percentage of the risk relieved at each time step for each node (see the paper for more)
+        :param forget_factor: Linear interpolation hyperparameter that controls how much previous state graph should
+        contribute to the current graph. 1 results in no contribution, 0 results in same state graphs. See the paper for
+        more description
         :param kwargs: ConnectivityUnit.read_flows kwargs
         :return: None
         """
@@ -45,7 +52,9 @@ class NetworkModel:
         if keep_unit:
             self.cu = cu
 
-        self.mat_x, self.mat_p = single_risk_update(cu.mat_f, measurement=measurement, mat_h=mat_h, mat_x_init=self.mat_x,
+        self.mat_f = self.mat_f * (1 - forget_factor) + cu.mat_f * forget_factor
+        self.mat_x, self.mat_p = single_risk_update(self.mat_f, measurement=measurement, mat_h=mat_h,
+                                                    mat_x_init=self.mat_x,
                                                     mat_p_init=self.mat_p, mat_q=self.mat_q, mat_r=mat_r, k_steps=1,
                                                     relief_factor=relief_factor, normalize=False)
 
