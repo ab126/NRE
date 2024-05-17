@@ -9,7 +9,8 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
     
     const entityClustersGroup = new THREE.Group(); // Center of group is mean center of elements
     const nMembers = [];
-    const clusCenters = [];
+    const clusCenters = [];    
+    const entityIndexInClus = [];
 
     const nEntities = Object.keys(pos).length;
     const nodeColors = new Float32Array( nEntities * 4 );
@@ -74,7 +75,7 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
         if (i % 3 == 0){
             entity.geometry = routerGeometry;
         }
-        entity.rotateX(Math.PI /2);
+        //entity.rotateX(Math.PI /2);
 
         let clusIndex = clusAssignment[entityName];
         entity.position.set(nodePosArray[i][0], nodePosArray[i][1], 0);
@@ -82,8 +83,8 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
         entity.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entity.name = entityName;
 
+        entityIndexInClus.push( entityClustersGroup.children[ clusIndex].children.length);
         entityClustersGroup.children[ clusIndex].add( entity );
-
     }
 
     // Move the center of the cluster to its original position
@@ -91,7 +92,7 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
         entityClustersGroup.children[j].position.add( clusCenters[j]);
     }
 
-    return entityClustersGroup;
+    return [entityClustersGroup, entityIndexInClus];
 }
 
 // Makes and returns the connectivity edges mesh object

@@ -8,21 +8,22 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import vertexShader from '../../shaders/vertex.glsl.js'
 import fragmentShader from '../../shaders/fragment.glsl.js'
 
-import {generateLegend} from '../legend/legendMaker.js';
+import {generateLegend, fontManager} from '../legend/legendMaker.js';
 import {makeNodes, makeConnectivityEdges, setNodePos, setEdgePosFromNodePos,
     computeClusterParams, colormapLinear, color1, color2} from '../hierarchical/graphMaker.js';
 
 import {calcMove} from '../force/force-directed.js'
-import * as data from '../../saves/net_data_medium1.json' assert {type: 'json'}; // 63
+import * as data from '../../saves/net_data_medium1.json' assert {type: 'json'}; // medium1
 console.log(data);
 
 const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
 let camera, scene, renderer, stats;
-let clusterGroup, clusMemberships, clusEdges;
+let clusterGroup, clusMemberships, clusEdges, entityIndexInClus;
 let edgeConnectivity, edgePos;
 let uiScene, orthoCamera;
 let ws;
+let maxLabelEntity = null;
 
 // Legend Parameters
 const defWidth = 900; 
@@ -87,15 +88,10 @@ let counter = 0;
 
 
 
-
-
-
-
-
-
 init();
+maxLabelEntity = labelMaxRisk(risk_mean, maxLabelEntity, clusterGroup);
 animate();
-console.log(clusterGroup)
+console.log(clusterGroup);
 
 // Message Queue
 function connectWebSocket(){
@@ -104,18 +100,33 @@ function connectWebSocket(){
 
     ws.onopen = function() {
         console.log('Connected to AMQP broker');
+
+        const container = document.getElementById("container");
+        container.className = 'slide';
     };
 
 
     ws.onmessage = function(event) {
         console.log('Received message from AMQP broker');
         let obj = JSON.parse(event.data);
-
+        
         funcEdges = obj.funcEdges;
         risk_mean = obj.risk_mean;
         risk_cov = obj.risk_cov;
+        let nFlows = obj.nFlows;
+        const msg = `- ${nFlows} flows processed`;
 
-        console.log(risk_mean)
+        console.log(risk_mean);
+
+        // Add to HTML
+        const para = document.createElement("p");
+        para.classList.add('p1');
+        const text = document.createTextNode(msg);
+        para.appendChild(text);
+
+        const logs = document.getElementById("logs");
+        logs.appendChild(para);
+        logs.scrollTop = logs.scrollHeight;
 
         // Update Edges
         updateEdgeColors(funcEdges, edgeConnectivity, nNodes)
@@ -123,6 +134,11 @@ function connectWebSocket(){
         // Update Nodes
         updateNodeColors(risk_mean, clusterGroup, nNodes, effectController.colorWithRisks)
         
+        //Label Some Entities
+        maxLabelEntity = labelMaxRisk(risk_mean, maxLabelEntity, clusterGroup);
+        console.log('Max Risk Entity: ', maxLabelEntity);
+
+        // Reset Step Size
         stepSize = effectController.stepSize;
 
     };
@@ -131,7 +147,6 @@ function connectWebSocket(){
         console.log('Disconnected from AMQP broker');
     };
 
-    console.log(ws);
 }
 
 function disconnectWebSocket() {
@@ -251,7 +266,7 @@ function init(){
     
     // Nodes
 
-    clusterGroup = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors,
+    [clusterGroup, entityIndexInClus] = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors,
         clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( clusterGroup );
 
@@ -343,6 +358,42 @@ function updateEdgeColors(funcEdges, edgeConnectivity, nNodes){
 
 }
 
+//Find the min and max risk entities and add text label to them
+function labelMaxRisk(risk_mean, maxLabelEntity, clusterGroup){
+
+    const values = Array.from(Object.keys(pos), (key) => risk_mean[key]);
+
+    let indexOfMaxValue = values.reduce((iMax, x, i, arr) => x > arr[iMax] ? i : iMax, 0);
+    //let indexOfMinValue = values.reduce((iMin, x, i, arr) => x < arr[iMin] ? i : iMin, 0);
+    
+
+    let name = namesArr[indexOfMaxValue];
+    let entity = clusterGroup.children[ clusAssignments[name]].children[ entityIndexInClus[indexOfMaxValue]];
+
+    
+    if (maxLabelEntity != null && maxLabelEntity != name) {
+
+        let oldMaxIndex = indDict[maxLabelEntity];
+        let oldEntity = clusterGroup.children[ clusAssignments[maxLabelEntity]].children[ entityIndexInClus[oldMaxIndex]];
+        oldEntity.remove(oldEntity.children[0]);
+        
+        // Add the text
+        let size = 0.05;
+        const fm = new fontManager(fontPath);
+        const liteMat = new THREE.MeshBasicMaterial( {
+            color: 0xffffff,
+            transparent: true,
+            opacity: .8,
+            side: THREE.DoubleSide
+        } );
+        fm.addFont("Max Risk Entity", [-size*4.5, -size/2.3, 0.05], liteMat, entity, size, [1, 1, 1]);
+        const text = entity.children[0];
+    }    
+
+    return entity.name
+}
+
+
 //Mask the Array along axs given the boolean mask
 function maskArray2(array, indices, axs=0) {
     
@@ -377,8 +428,6 @@ function moveNodes(clusterGroup, allPosArr, allEdgeWeights, clusMemberships, ste
     return allPosArr;
 
 }
-
-
 
 
 function animate() {

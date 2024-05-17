@@ -5,23 +5,30 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 const defWidth = 900; 
 const defHeight = 500; 
 
-class fontManager{
+export class fontManager{
     constructor(fontPath){
         this.path = fontPath;
     }
 
-    addFont(message, textPos, textMaterial, group2Add, size=0.03){
+    addFont(message, textPos, textMaterial, group2Add=null, size=0.03, scale=null){
 
         const loader = new FontLoader();
+        let text;
     
         loader.load( this.path, function ( font ) {
     
             const shapes = font.generateShapes(message, size);
             const geometry = new THREE.ShapeGeometry( shapes );
-            const text = new THREE.Mesh( geometry, textMaterial );
-            text.scale.set(0.6, 1, 1);
+            text = new THREE.Mesh( geometry, textMaterial );
+            if (scale == null) {
+                text.scale.set(0.6, 1, 1);
+            } else {
+                text.scale.set(...scale);
+            }         
             text.position.set(...textPos); 
-            group2Add.add( text );
+            if (group2Add != null) {
+                group2Add.add( text );
+            }
     
             //animate();
     

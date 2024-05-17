@@ -16,7 +16,7 @@ import scipy.fft
 from pomegranate.bayesian_network import BayesianNetwork
 from src.archive.bbn_functions import get_DAG_from_model
 
-MIN_SAMPLES = 5  # Minimum number of samples required for MI calculation
+MIN_SAMPLES = 5  # Minimum number of samples required for connectivity graph calculation
 
 cic_conn_param_specs = {
     'Activation': {'method': 'activation'},
@@ -58,7 +58,7 @@ class ConnectivityUnit:
                             'Flow Duration', 'Flow Speed', 'Response Time', 'Packet Delay', 'Header Length',
                             'Num Active Packets', 'Active Time', 'Idle Time']
         self.conn_param_specs = cic_conn_param_specs
-        self.samples = np.array([[]])
+        self.samples = np.empty((0,2))
         self.names = []
         self.num_appearances = []  # Number of times entities appear in connection data 
         self.mat_f = np.array([[]])
@@ -249,6 +249,9 @@ class ConnectivityUnit:
         :param clear_samples: If True clears the samples to recover memory
         :return : None
         """
+
+        assert self.samples.shape[0] >= MIN_SAMPLES, "Number of Samples must be at least {}!".format(MIN_SAMPLES)
+
         if method == 'bbn':
             # Bayesian network from samples
             learnt_model = BayesianNetwork.from_samples(self.samples, state_names=self.names)

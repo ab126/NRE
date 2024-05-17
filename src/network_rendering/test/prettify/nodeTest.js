@@ -29,6 +29,7 @@ let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
 const nNodes = Object.keys(pos).length;
 console.log(pos)
 
+initGUI();
 init();
 animate();
 
@@ -93,10 +94,12 @@ function initGUI(){
 
 function init(){ 
     
-    initGUI();
+    
     
     // Scene & Camera
     scene = new THREE.Scene();
+    //let width = viewportSize.getWidth();
+    //let height = viewportSize.getHeight();
     camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
     camera.position.z = 4;
     scene.add(camera)
@@ -172,10 +175,19 @@ function init(){
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
     
+    /*
     const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
         vertexShader: vertexShader,
         fragmentShader: fragmentShader,
         transparent: true,
+    } );
+    */
+
+    const edgeConnectivityMaterial = new THREE.LineBasicMaterial( {
+        color: '#830101',
+        linewidth: 1,
+        linecap: 'round', //ignored by WebGLRenderer
+        linejoin:  'round' //ignored by WebGLRenderer
     } );
 
     edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );

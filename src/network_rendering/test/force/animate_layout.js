@@ -60,7 +60,7 @@ const effectController = {
     maxIter: 1950,
     stepSize: .015,
     alpha: 3.35,
-    activateForce: true
+    activateForce: false
 };
 
 // Read planar positions
@@ -132,7 +132,7 @@ function initGUI(){
 
     gui.add( effectController, 'activateForce' );
 
-    gui.close();
+    //gui.close();
 }
 
 function init(){ 

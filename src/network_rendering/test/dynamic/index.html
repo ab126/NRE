@@ -3,19 +3,13 @@
 	<head>
 		<title>Risk Evolution - three.js</title>
 		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-		<link type="text/css" rel="stylesheet" href="main.css">
-	</head>
-	<body>
+		<link rel="stylesheet" href="style.css">
 
-		<script type="importmap">
-			{
-			  "imports": {
-				"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-				"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-			  }
-			}
-		</script>
+	</head>
+
+	<!-- Logs -->
+
+	<body>
 
 		<script id="vertexShader" type="x-shader/x-vertex">
 
@@ -62,6 +56,16 @@
 			}
 
 		</script>
+		
+
+		<div id="container" class="hidden" >
+			<div id="head">
+				<h2 class="p1">Logs</h2>
+			</div>			
+				
+			<div id="logs"></div>
+		</div>
+
 		<script type="module" src="/dynamic.js">
 		</script>
 
