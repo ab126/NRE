@@ -114,7 +114,8 @@ function connectWebSocket(){
         risk_mean = obj.risk_mean;
         risk_cov = obj.risk_cov;
         let nFlows = obj.nFlows;
-        const msg = `- ${nFlows} flows processed`;
+        let timeStamp = obj.timeStamp;
+        const msg = `- ${timeStamp}: ${nFlows} flows processed`;
 
         console.log(risk_mean);
 
@@ -386,7 +387,7 @@ function labelMaxRisk(risk_mean, maxLabelEntity, clusterGroup){
             opacity: .8,
             side: THREE.DoubleSide
         } );
-        fm.addFont("Max Risk Entity", [-size*4.5, -size/2.3, 0.05], liteMat, entity, size, [1, 1, 1]);
+        fm.addFont("Max Risk", [-size*2.5, -size/2., 0.05], liteMat, entity, size, [1, 1, 1]);
         const text = entity.children[0];
     }    
 
@@ -432,6 +433,14 @@ function moveNodes(clusterGroup, allPosArr, allEdgeWeights, clusMemberships, ste
 
 function animate() {
     
+    requestAnimationFrame( animate );
+
+    render();
+
+    stats.update();
+}
+
+function render() {
     const time = Date.now() * 0.001;
 
     if (effectController.activateForce){
@@ -447,12 +456,7 @@ function animate() {
     renderer.clear();
 	renderer.render( scene, camera );
     renderer.render( uiScene, orthoCamera );
-
-    requestAnimationFrame( animate );
-
-    stats.update();
 }
-
 
 
 

@@ -3,21 +3,55 @@ import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { fontManager} from '../legend/legendMaker.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
-import vertexShader from '../../shaders/vertex.glsl.js'
-import fragmentShader from '../../shaders/fragment.glsl.js'
 
-let camera, scene, renderer, stats;
+let persCamera, camera, cameraHelper, scene, renderer, stats;
 let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
 let uiScene, orthoCamera, sprite;
+let plane, greeter;
+
+const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
 // Node parameters
 const baseSize = 0.03; //0.05
 const sizeMult = .07;
-const nodeGeometry = new THREE.ConeGeometry( 0.1, 0.2, 3 );
-const nodeMaterial = new THREE.MeshPhongMaterial();//new THREE.MeshStandardMaterial( {color: 0x0a0859} );
+const nodeGeometry = new THREE.OctahedronGeometry( 0.07, 4 );
+const nodeMaterial = new THREE.MeshPhongMaterial({
+    color:'#2CF604',
+    emissive:'#000000',
+    emissiveIntensity:1,
+    specular:'#ffffff',
+    shininess:30
+});
+
+const uniforms = {
+    time : { value: 0.0 },
+};
+
+const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
+    uniforms: uniforms,
+    vertexShader: document.getElementById( 'vertexShader' ).textContent,
+    fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+} );
+
+
+
+/*
+const edgeConnectivityMaterial = new THREE.LineBasicMaterial( {
+    color: '#830101',
+    linewidth: 1,
+    linecap: 'round', //ignored by WebGLRenderer
+    linejoin:  'round' //ignored by WebGLRenderer
+} );
+*/
+
 
 const effectController = {
     showConnectivity: true
@@ -27,7 +61,7 @@ const effectController = {
 //const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
 let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
 const nNodes = Object.keys(pos).length;
-console.log(pos)
+console.log(risk)
 
 initGUI();
 init();
@@ -94,35 +128,101 @@ function initGUI(){
 
 function init(){ 
     
-    
-    
-    // Scene & Camera
+    // Scene 
     scene = new THREE.Scene();
-    //let width = viewportSize.getWidth();
-    //let height = viewportSize.getHeight();
+
+    //Plane
+    const planeGeometry = new THREE.PlaneGeometry( 8, 8 );
+    const planeMaterial = new THREE.MeshStandardMaterial( { color: '#4a4a4a'} )
+    plane = new THREE.Mesh( planeGeometry, planeMaterial );
+    plane.position.z = -0.1
+    scene.add( plane );
+
+    // Cameras
+    
+    
     camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-    camera.position.z = 4;
-    scene.add(camera)
+    camera.position.set(0, -15, 2);
+    camera.lookAt(plane.position);
+    camera.translateY(5);
+    
+    scene.add(camera);
+
+    persCamera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
+    persCamera.position.z = 4;
+    scene.add(persCamera);
+
+    cameraHelper = new THREE.CameraHelper( persCamera );
+    scene.add( cameraHelper );
+
+    // Greeter
+    const loader = new FontLoader();
+
+    const liteMat = new THREE.MeshBasicMaterial( {
+        color: 0xffffff,
+        transparent: true,
+        opacity: .8,
+        side: THREE.DoubleSide
+    } );
+    const fontSize = 5;
+
+    loader.load( fontPath, function ( font ) {
+    
+        const geometryTitle = new TextGeometry( 'NRE', { 
+            font: font,    
+            size: fontSize,
+            curveSegments: 3,
+            bevelEnabled: false,
+        }  );
+        geometryTitle.scale(1, 1, .005);  
+        geometryTitle.center();
+        
+        const geometrySubTitle = new TextGeometry( '- Network Risk Estimation-\n \xa0\xa0 Visualization Tool', { 
+            font: font,    
+            size: fontSize/3,
+            curveSegments: 3,
+            bevelEnabled: false,
+        }  );
+        geometrySubTitle.scale(1, 1, .005); 
+        geometrySubTitle.center();
+        
+        greeter = new THREE.Mesh( geometryTitle, liteMat );
+        const textSubTitle = new THREE.Mesh( geometrySubTitle, liteMat );
+        textSubTitle.translateY( -fontSize * 1.4)
+        greeter.add(textSubTitle);
+
+        greeter.rotateX( Math.PI / 2);
+        greeter.position.set(0, 7, 20);
+        scene.add(greeter);
+
+        persCamera.position.set(0, -7, 20);
+        //persCamera.lookAt(greeter);
+
+    } );
+    //fm.addFont("NRE", [0, -fontSize/2, 4], liteMat, scene, fontSize);
+    
 
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
     //scene.background = new THREE.Color( 0xc4c4c4 );
+    const light = new THREE.DirectionalLight( 0xffffff, 0.5 );
+    light.position.set(1, 1, 1);
+    scene.add( light );
 
-    //Plane
-    const planeGeometry = new THREE.PlaneGeometry( 8, 8 );
-    const planeMaterial = new THREE.MeshStandardMaterial( { color: 0xa3a3a3 } )
-    const plane = new THREE.Mesh( planeGeometry, planeMaterial );
-    plane.position.z = -0.1
-    scene.add( plane );
+    
 
     // Renderer
+    const container = document.getElementById('container')
+    
     renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight );
-    document.body.appendChild( renderer.domElement );
+    container.appendChild( renderer.domElement );
+    renderer.setScissorTest( true );
 
     // Stats & Resize Window
     stats = new Stats();
-    document.body.appendChild( stats.dom );
+    container.appendChild( stats.dom );
 
     window.addEventListener( 'resize', onWindowResize );
 
@@ -175,34 +275,23 @@ function init(){
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
     
-    /*
-    const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader,
-        transparent: true,
-    } );
-    */
-
-    const edgeConnectivityMaterial = new THREE.LineBasicMaterial( {
-        color: '#830101',
-        linewidth: 1,
-        linecap: 'round', //ignored by WebGLRenderer
-        linejoin:  'round' //ignored by WebGLRenderer
-    } );
+    
 
     edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     scene.add( edgeConnectivity );
     edgeConnectivity.visible = effectController.showConnectivity;
-    
 
-    const controls = new OrbitControls( camera, renderer.domElement );   
-    
+    const controls = new OrbitControls( persCamera, renderer.domElement );   
+    console.log(edgeConnectivity);
 }
 
 function onWindowResize() {
 
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+
+    persCamera.aspect = window.innerWidth / window.innerHeight;
+    persCamera.updateProjectionMatrix();
 
     renderer.setSize( window.innerWidth, window.innerHeight );
 
@@ -313,14 +402,34 @@ function makeAllEdges(pos, elavate) {
 
 
 function animate() {
-    
-    const time = Date.now() * 0.001;    
-
-	renderer.render( scene, camera );
-
+      
     requestAnimationFrame( animate );
 
+	render();    
+
     stats.update();
+}
+
+function render() {
+
+    uniforms.time.value += 0.01;
+    //console.log(uniforms)
+    
+
+    cameraHelper.visible = true;
+    renderer.setClearColor( 0x111111, 1 );
+    renderer.setScissor( window.innerWidth /4, window.innerHeight /2, window.innerWidth /2, window.innerHeight /2);
+    renderer.setViewport( window.innerWidth /4, window.innerHeight /2, window.innerWidth /2, window.innerHeight /2);	
+    renderer.render( scene, camera );
+
+    cameraHelper.visible = false;
+
+    renderer.setClearColor( 0x000000, 1 );
+    renderer.setScissor( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);
+    renderer.setViewport( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);
+				
+    renderer.render( scene, persCamera );
+    
 }
 
 
