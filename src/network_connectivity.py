@@ -351,7 +351,13 @@ class ConnectivityUnit:
         else:  # Covariance Method (Assuming gaussian RVs)
             _, sample_cov = fit_mvn_to_samples(self.samples)
 
-            mat_f, mat_r = get_mat_f_q_from_covariance(sample_cov)
+            if method == 'signed':
+                mat_f, mat_r = get_mat_f_q_from_covariance(sample_cov, signed=True)
+            elif method == 'cov':
+                mat_f, mat_r = get_mat_f_q_from_covariance(sample_cov)
+            else:
+                raise NotImplementedError("Method {} is not implemented.".format(method))
+
             self.mat_f = mat_f
             if infer_mat_r:
                 self.mat_r = mat_r
@@ -600,11 +606,12 @@ def _update_sample(window_sample, flow_row, counts, s_ind, d_ind, src_feature_co
         raise Exception("type must be in ['average', 'total', 'last', 'activation']")
 
 
-def get_mat_f_q_from_covariance(cov):
+def get_mat_f_q_from_covariance(cov, signed=False):
     """
     Given the covariance matrix of entities, returns mat_f and mat_q matrices for Kalman filter
 
     :param cov: Covariance matrix of samples of entities
+    :param signed: If True, anticorrelated entities have minus sign in respective edge weight
     :return mat_f, mat_q:
         mat_f: Linear System Model in Kalman Filter formulation. Entries are positive or zeros if respective variance is
          zero
@@ -614,7 +621,8 @@ def get_mat_f_q_from_covariance(cov):
     mat_q = np.diag(np.diag(cov))
     var_mult_mat = np.sqrt(np.outer(variances, variances))
     mat_f = np.eye(cov.shape[0])
-    np.divide(np.abs(cov), var_mult_mat, out=mat_f, where=var_mult_mat != 0)
+    temp_mat = np.abs(cov) if not signed else cov
+    np.divide(temp_mat, var_mult_mat, out=mat_f, where=var_mult_mat != 0)
     return mat_f, mat_q
 
 
