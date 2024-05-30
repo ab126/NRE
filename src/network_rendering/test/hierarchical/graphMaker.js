@@ -110,6 +110,7 @@ export function makeConnectivityEdges(edgeConnectivityMaterial, pos, funcEdges, 
     
 }
 
+// TODO: Might not need makers using pos
 /**
  * Makes edge defining points from functional connectivity edge array
  * @param {*} pos Object whose fields are entity ids with [pos_x, pos_y] array describing 2D position
@@ -157,6 +158,44 @@ export function makeAllEdges(pos, edges, risk, elavate) {
     return [edgePositions, edgeColors];
 }
 
+// Makes and returns the topology edges mesh object
+export function makeTopologyEdges(edgeTopologyMaterial, pos, edgeList){
+
+    const edgePositions = makeEdgePositions(edgeList, pos, false);
+
+    const edgeTopologyGeometry = new THREE.BufferGeometry();
+    edgeTopologyGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePositions, 3 ) );
+    
+    return new THREE.LineSegments( edgeTopologyGeometry, edgeTopologyMaterial );
+    
+}
+
+/**
+ * Makes edge defining points
+ * @param {*} src Source entity
+ * @param {*} dst Destination entity
+ */
+function makeEdgePositions(edgeList, pos, elavate){
+    const nEdges = edgeList.length
+    const edgePositions = new Float32Array( nEdges * 2 * 3 );
+    let src, dst;
+
+    for (let i = 0; i < nEdges; i++) {
+
+        [src, dst] = edgeList[i];
+
+        edgePositions[ 6 * i ] = pos[src][0]; 
+        edgePositions[ 6 * i + 1] = pos[src][1];
+        edgePositions[ 6 * i + 2] = elavate ? risk_mean[src] : 0;
+
+        edgePositions[ 6 * i + 3] = pos[dst][0]; 
+        edgePositions[ 6 * i + 4] = pos[dst][1];
+        edgePositions[ 6 * i + 5] = elavate ? risk_mean[dst] : 0;
+
+    }
+    return edgePositions
+}
+
 // For altering Positions
 
 // Sets the node positions according to the new node position array
@@ -170,15 +209,22 @@ export function setNodePos(nodeGroup, nodePos){
     }
 }
 
+// Get all possible edge positions from node positions
+export function setAllEdgePosFromNodePos(edgesObject, nodePos) {
+    const edgePos = nodePos2AllEdgePos(nodePos);
+    edgesObject.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
+    edgesObject.geometry.attributes.position.needsUpdate = true;
+}
+
 // Get the edge positions from node positions
-export function setEdgePosFromNodePos(edgeConnectivity, nodePos) {
-    const edgePos = nodePos2edgePos(nodePos);
-    edgeConnectivity.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
-    edgeConnectivity.geometry.attributes.position.needsUpdate = true;
+export function setEdgePosFromNodePos(edgesObject, nodePos, edgeList, indDict) {
+    const edgePos = nodePos2EdgePos(nodePos, edgeList, indDict);
+    edgesObject.geometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
+    edgesObject.geometry.attributes.position.needsUpdate = true;
 }
 
 // Returns edge position buffer from node position array
-export function nodePos2edgePos(nodePosArr){
+function nodePos2AllEdgePos(nodePosArr){
     const nNodes = nodePosArr.length;
     const edgePos = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
 
@@ -203,6 +249,31 @@ export function nodePos2edgePos(nodePosArr){
     }
     return edgePos;
 }
+
+// Returns edge position buffer from node position array
+function nodePos2EdgePos(nodePosArr, edgeList, indDict){
+
+    const nEdges = edgeList.length
+    const edgePositions = new Float32Array( nEdges * 2 * 3 );
+
+    for (let k = 0, i, j, src, dst; k < nEdges; k++) {
+
+        [src, dst] = edgeList[k];
+        i = indDict[src];
+        j = indDict[dst];
+
+        edgePositions[ 6 * k ] = nodePosArr[i][0];
+        edgePositions[ 6 * k + 1] = nodePosArr[i][1];
+        edgePositions[ 6 * k + 2] = 0;
+
+        edgePositions[ 6 * k + 3] = nodePosArr[j][0]; 
+        edgePositions[ 6 * k + 4] = nodePosArr[j][1];
+        edgePositions[ 6 * k + 5] = 0;
+
+    }
+    return edgePositions;
+}
+
 
 // Compute the Cluster Related parameters ahead of time to reduce overhead
 export function computeClusterParams(clusterGroup, allEdgeWeights, clusAssignments, indDict){

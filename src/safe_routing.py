@@ -40,6 +40,7 @@ def communication_graph_from_df(df, entity_names=None, keep_outsiders=True, src_
         df = df[idx].copy()
 
     g = nx.Graph()
+    g.add_nodes_from(entity_names)
     for row in df.to_dict('records'):
         src = row[src_id_col]
         dst = row[dst_id_col]

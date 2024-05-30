@@ -58,7 +58,7 @@ class ConnectivityUnit:
                             'Flow Duration', 'Flow Speed', 'Response Time', 'Packet Delay', 'Header Length',
                             'Num Active Packets', 'Active Time', 'Idle Time']
         self.conn_param_specs = cic_conn_param_specs
-        self.samples = np.empty((0,2))
+        self.samples = np.empty((0, 2))
         self.names = []
         self.num_appearances = []  # Number of times entities appear in connection data 
         self.mat_f = np.array([[]])
@@ -154,7 +154,7 @@ class ConnectivityUnit:
                                             src_id_col=src_id_col, dst_id_col=dst_id_col)
 
                 if conn_param is None:
-                    #pass
+                    # pass
                     _update_sample(temp, row, counts, s_ind, d_ind, src_feature_col, dst_feature_col, method=method)
                 else:
                     kwargs = self.conn_param_specs[conn_param]
@@ -250,7 +250,8 @@ class ConnectivityUnit:
         :return : None
         """
 
-        assert self.samples.shape[0] >= MIN_SAMPLES, "Number of Samples must be at least {}!".format(MIN_SAMPLES)
+        assert self.samples.shape[0] >= MIN_SAMPLES, "Number of Samples ({}) must be at least {}!".format(
+            self.samples.shape[0], MIN_SAMPLES)
 
         if method == 'bbn':
             # Bayesian network from samples
@@ -484,7 +485,6 @@ class ConnectivityUnit:
 
         sub_units = []
         for sub_names in gcc:
-
             # Form new units
             ind = np.array([i for i in range(len(self.names)) if self.names[i] in sub_names])
 
@@ -493,7 +493,7 @@ class ConnectivityUnit:
             sub_cu.names = list(np.array(self.names)[ind])
             sub_cu.num_appearances = self.num_appearances[ind].copy()
 
-            sub_cu.mat_f = self.mat_f[ind,:][:, ind].copy()
+            sub_cu.mat_f = self.mat_f[ind, :][:, ind].copy()
             sub_cu.g = self.g.subgraph(sub_names)
             sub_units.append(sub_cu)
 
@@ -723,4 +723,3 @@ def apply_partitioning(cu, n_clus, plot_bool=True, fontsize=24, seed=5):
         curr_unit.remove_entities(remove_names)
         sub_units.append(copy.deepcopy(curr_unit))
     return sub_units
-

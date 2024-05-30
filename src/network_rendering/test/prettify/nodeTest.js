@@ -149,7 +149,7 @@ function init(){
     scene.add(camera);
 
     persCamera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
-    persCamera.position.z = 4;
+    persCamera.position.set(0, 0, 4);
     scene.add(persCamera);
 
     cameraHelper = new THREE.CameraHelper( persCamera );
@@ -316,15 +316,6 @@ function generateSampleNet(xCenter, yCenter = 0, diam = 2){
     return {pos, risk, edges, entityColors, extras}
 }
 
-// Sets the node positions according to the new node position array
-function setNodePos(nodeGroup, nodePos){
-    const nNodes = nodeGroup.children.length;
-    for ( let i = 0; i < nNodes; i ++ ) {
-
-        const dodec = nodeGroup.children[i];
-        dodec.position.set(nodePos[i][0], nodePos[i][1], 0);
-    }
-}
 
 // Returns edge position buffer from node position array
 function nodePos2edgePos(nodePosArr){

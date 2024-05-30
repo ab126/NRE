@@ -9,7 +9,7 @@ import vertexShader from '../../shaders/vertex.glsl.js'
 import fragmentShader from '../../shaders/fragment.glsl.js'
 
 import {generateLegend, fontManager} from '../legend/legendMaker.js';
-import {makeNodes, makeConnectivityEdges, setNodePos, setEdgePosFromNodePos,
+import {makeNodes, makeConnectivityEdges, makeTopologyEdges, setNodePos, setAllEdgePosFromNodePos, setEdgePosFromNodePos,
     computeClusterParams, colormapLinear, color1, color2} from '../hierarchical/graphMaker.js';
 
 import {calcMove} from '../force/force-directed.js'
@@ -20,7 +20,7 @@ const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
 let camera, scene, renderer, stats;
 let clusterGroup, clusMemberships, clusEdges, entityIndexInClus;
-let edgeConnectivity, edgePos;
+let edgeConnectivity, edgeTopology;
 let uiScene, orthoCamera;
 let ws;
 let maxLabelEntity = null;
@@ -59,6 +59,7 @@ const topologyMaterial = new THREE.LineBasicMaterial({
 // GUI
 const effectController = {
     showConnectivity: true,
+    showTopology: false,
     colorWithRisks: true,
     maxIter: 1950,
     stepSize: .015,
@@ -113,11 +114,12 @@ function connectWebSocket(){
         funcEdges = obj.funcEdges;
         risk_mean = obj.risk_mean;
         risk_cov = obj.risk_cov;
+        topologyEdges = obj.topologyEdges;
         let nFlows = obj.nFlows;
         let timeStamp = obj.timeStamp;
-        const msg = `- ${timeStamp}: ${nFlows} flows processed`;
+        const msg = `- ${timeStamp}: ${nFlows} flows`;
 
-        console.log(risk_mean);
+        console.log(funcEdges);
 
         // Add to HTML
         const para = document.createElement("p");
@@ -130,7 +132,12 @@ function connectWebSocket(){
         logs.scrollTop = logs.scrollHeight;
 
         // Update Edges
-        updateEdgeColors(funcEdges, edgeConnectivity, nNodes)
+        updateConnectivityColors(funcEdges, edgeConnectivity, nNodes);
+        scene.remove(edgeTopology);
+        edgeTopology = makeTopologyEdges(topologyMaterial, pos, topologyEdges);
+        scene.add(edgeTopology);
+        edgeTopology.visible = effectController.showTopology;
+        //setEdgePosFromNodePos(edgeTopology, allNodePos, topologyEdges, indDict);
 
         // Update Nodes
         updateNodeColors(risk_mean, clusterGroup, nNodes, effectController.colorWithRisks)
@@ -162,6 +169,12 @@ function initGUI(){
     basic.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
 
         edgeConnectivity.visible = value
+
+    } );
+
+    basic.add( effectController, 'showTopology' ).onChange( function ( value ) {
+
+        edgeTopology.visible = value
 
     } );
 
@@ -204,7 +217,7 @@ function initGUI(){
 
     basic.add( effectController, 'activateForce' );
 
-    basic.close();
+    //basic.close();
 
     const loadData = gui.addFolder('Load Data');
 
@@ -278,6 +291,11 @@ function init(){
     
     scene.add( edgeConnectivity );
     edgeConnectivity.visible = effectController.showConnectivity;
+
+    // Topology 
+    edgeTopology = makeTopologyEdges(topologyMaterial, pos, topologyEdges);
+    scene.add( edgeTopology );
+    edgeTopology.visible = effectController.showTopology;
     
     // Cluster parameters
     [clusMemberships, clusEdges] = computeClusterParams(clusterGroup, funcEdges, clusAssignments, indDict);
@@ -329,7 +347,7 @@ function updateNodeColors(risk_mean, clusterGroup, nNodes, colorWithRisks){
     }
 }
 
-function updateEdgeColors(funcEdges, edgeConnectivity, nNodes){
+function updateConnectivityColors(funcEdges, edgeConnectivity, nNodes){
 
     const edgeColors = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
     
@@ -448,7 +466,8 @@ function render() {
             allNodePos = moveNodes(clusterGroup, allNodePos, funcEdges, clusMemberships, stepSize, 1.3, .1, alpha); // 2.3
             stepSize = (stepSize > dt) ? stepSize - dt : 0;
             
-            setEdgePosFromNodePos(edgeConnectivity, allNodePos);
+            setAllEdgePosFromNodePos(edgeConnectivity, allNodePos);
+            setEdgePosFromNodePos(edgeTopology, allNodePos, topologyEdges, indDict);
         }
         counter += 1;
     }

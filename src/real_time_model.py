@@ -47,7 +47,7 @@ class NetworkModel:
 
         df = preprocess_df(df_conn, date_col=' Timestamp')
         cu = ConnectivityUnit()
-        cu.read_flows(df, entity_names=self.entity_names, window_type='time', **kwargs)
+        cu.read_flows(df, entity_names=self.entity_names, **kwargs)
         cu.fit_connectivity_model(method='cov', verbose=True)
         if keep_unit:
             self.cu = cu
