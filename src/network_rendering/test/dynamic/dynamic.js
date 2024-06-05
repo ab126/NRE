@@ -70,15 +70,13 @@ const effectController = {
 };
 
 // Read planar positions
-let {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, clusAssignments, extras} = data
-const namesArr = Object.keys(pos);
+let {namesArr, nodePosArr, topologyEdges, riskArr, riskCov: riskCov, funcEdges, entityColors, clusAssignments, extras} = data
 const nNodes = namesArr.length;
 const indDict = {}; // Dictionary of {name:index}
 for (let i = 0; i < nNodes; i++) {
     indDict[namesArr[i]] = i;
 }
 
-let allNodePos = Array.from(Object.keys(pos), (key) => pos[key]);
 let stepSize = effectController.stepSize;
 let dt = stepSize / (effectController.maxIter + 1);
 let alpha = effectController.alpha
@@ -90,9 +88,10 @@ let counter = 0;
 
 
 init();
-maxLabelEntity = labelMaxRisk(risk_mean, maxLabelEntity, clusterGroup);
+maxLabelEntity = labelMaxRisk(riskArr, maxLabelEntity, clusterGroup);
 animate();
 console.log(clusterGroup);
+console.log(namesArr)
 
 // Message Queue
 function connectWebSocket(){
@@ -112,14 +111,20 @@ function connectWebSocket(){
         let obj = JSON.parse(event.data);
         
         funcEdges = obj.funcEdges;
-        risk_mean = obj.risk_mean;
-        risk_cov = obj.risk_cov;
+        riskArr = obj.riskArr;
+        riskCov = obj.riskCov;
         topologyEdges = obj.topologyEdges;
+
+
+
+        const streamNames = obj.names;
         let nFlows = obj.nFlows;
         let timeStamp = obj.timeStamp;
         const msg = `- ${timeStamp}: ${nFlows} flows`;
 
-        console.log(funcEdges);
+        //console.log(funcEdges);
+        //console.log(topologyEdges);
+        console.log(riskArr);
 
         // Add to HTML
         const para = document.createElement("p");
@@ -133,17 +138,18 @@ function connectWebSocket(){
 
         // Update Edges
         updateConnectivityColors(funcEdges, edgeConnectivity, nNodes);
+
         scene.remove(edgeTopology);
-        edgeTopology = makeTopologyEdges(topologyMaterial, pos, topologyEdges);
+        edgeTopology = makeTopologyEdges(topologyMaterial, nodePosArr, topologyEdges, indDict);
         scene.add(edgeTopology);
         edgeTopology.visible = effectController.showTopology;
         //setEdgePosFromNodePos(edgeTopology, allNodePos, topologyEdges, indDict);
 
         // Update Nodes
-        updateNodeColors(risk_mean, clusterGroup, nNodes, effectController.colorWithRisks)
+        updateNodeColors(riskArr, clusterGroup, nNodes)
         
         //Label Some Entities
-        maxLabelEntity = labelMaxRisk(risk_mean, maxLabelEntity, clusterGroup);
+        maxLabelEntity = labelMaxRisk(riskArr, maxLabelEntity, clusterGroup);
         console.log('Max Risk Entity: ', maxLabelEntity);
 
         // Reset Step Size
@@ -280,20 +286,20 @@ function init(){
     
     // Nodes
 
-    [clusterGroup, entityIndexInClus] = makeNodes(entityGeometry, routerGeometry, pos, funcEdges, risk_mean, entityColors,
+    [clusterGroup, entityIndexInClus] = makeNodes(entityGeometry, routerGeometry, namesArr,  nodePosArr, funcEdges, riskArr, entityColors,
         clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( clusterGroup );
 
     // Edges
 
     // Connectivity
-    edgeConnectivity = makeConnectivityEdges(edgeConnectivityMaterial, pos, funcEdges, risk_mean);
+    edgeConnectivity = makeConnectivityEdges(edgeConnectivityMaterial, nodePosArr, funcEdges);
     
     scene.add( edgeConnectivity );
     edgeConnectivity.visible = effectController.showConnectivity;
 
     // Topology 
-    edgeTopology = makeTopologyEdges(topologyMaterial, pos, topologyEdges);
+    edgeTopology = makeTopologyEdges(topologyMaterial, nodePosArr, topologyEdges, indDict);
     scene.add( edgeTopology );
     edgeTopology.visible = effectController.showTopology;
     
@@ -303,6 +309,7 @@ function init(){
     
     
 }
+
 
 function onWindowResize() {
 
@@ -319,23 +326,23 @@ function onWindowResize() {
 
 }
 
-function updateNodeColors(risk_mean, clusterGroup, nNodes, colorWithRisks){
+function updateNodeColors(riskArr, clusterGroup, nNodes){
     
     // Update Nodes
     const nodeColors = new Float32Array( nNodes * 4 );
 
-    for (let i = 0, entityName, t, clr; i < nNodes ; i++) {
-        entityName = namesArr[i];
+    for (let i = 0, t, clr, normRisk; i < nNodes ; i++) {
 
-        t = risk_mean[entityName] / extras.diam_z > 0 ? risk_mean[entityName] / extras.diam_z: 0;
+        normRisk = riskArr[i] / extras.diam_z
+        t = normRisk > 0 ? (normRisk <= 1 ? normRisk: 1): 0;
+        
         clr = colormapLinear(color1, color2, t);
 
-        nodeColors[ i * 4 ] = colorWithRisks ? clr.r / 256 : entityColors[entityName][0];
-        nodeColors[ i * 4 + 1] = colorWithRisks ? clr.g / 256 : entityColors[entityName][1];
-        nodeColors[ i * 4 + 2] = colorWithRisks ? clr.b / 256 : entityColors[entityName][2];
-        nodeColors[ i * 4 + 3] = colorWithRisks ? 1 : entityColors[entityName][3];
+        nodeColors[ i * 4 ] = clr.r / 256;
+        nodeColors[ i * 4 + 1] = clr.g / 256;
+        nodeColors[ i * 4 + 2] =clr.b / 256;
+        nodeColors[ i * 4 + 3] = 1;
     }
-
 
     for (let j=0; j < clusterGroup.children.length; j++) {
         for (let k=0, i, entity; k < clusterGroup.children[j].children.length; k++){
@@ -372,17 +379,12 @@ function updateConnectivityColors(funcEdges, edgeConnectivity, nNodes){
         }
     }
     edgeConnectivity.geometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
-
-
-
 }
 
 //Find the min and max risk entities and add text label to them
-function labelMaxRisk(risk_mean, maxLabelEntity, clusterGroup){
+function labelMaxRisk(riskArr, maxLabelEntity, clusterGroup){
 
-    const values = Array.from(Object.keys(pos), (key) => risk_mean[key]);
-
-    let indexOfMaxValue = values.reduce((iMax, x, i, arr) => x > arr[iMax] ? i : iMax, 0);
+    let indexOfMaxValue = riskArr.reduce((iMax, x, i, arr) => x > arr[iMax] ? i : iMax, 0);
     //let indexOfMinValue = values.reduce((iMin, x, i, arr) => x < arr[iMin] ? i : iMin, 0);
     
 
@@ -463,11 +465,11 @@ function render() {
 
     if (effectController.activateForce){
         if ( counter % nFrame == 0) {
-            allNodePos = moveNodes(clusterGroup, allNodePos, funcEdges, clusMemberships, stepSize, 1.3, .1, alpha); // 2.3
+            nodePosArr = moveNodes(clusterGroup, nodePosArr, funcEdges, clusMemberships, stepSize, 1.3, .1, alpha); // 2.3
             stepSize = (stepSize > dt) ? stepSize - dt : 0;
             
-            setAllEdgePosFromNodePos(edgeConnectivity, allNodePos);
-            setEdgePosFromNodePos(edgeTopology, allNodePos, topologyEdges, indDict);
+            setAllEdgePosFromNodePos(edgeConnectivity, nodePosArr);
+            setEdgePosFromNodePos(edgeTopology, nodePosArr, topologyEdges, indDict);
         }
         counter += 1;
     }

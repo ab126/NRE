@@ -272,8 +272,8 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
                iterations=50, plot_bool=True, with_labels=False, idle=False):
     """Computes the "Pie Layout" for the network given by mat_f"""
 
-    gr, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
-    clus_assgn = {node: int(i) for node, i in zip(gr.nodes, new_labels)}
+    g_relabeled, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
+    clus_assgn = {node: int(i) for node, i in zip(g_relabeled.nodes, new_labels)}
 
     phi = 2 * np.pi / (n_cluster - 1) if n_cluster > 1 else 2 * np.pi # Constant angle of pie given for each cluster
     r = r_const * d_xy / phi
@@ -281,17 +281,17 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
     cmap = plt.get_cmap('cool')
 
     pos_pie = {}
-    node_colors = []
+    node_colors = {}
     for i in clusters:
 
         ind = new_labels == i
-        gs = gr.subgraph(np.array(gr.nodes)[ind])
+        g_sub = g_relabeled.subgraph(np.array(g_relabeled.nodes)[ind])
         theta_i = phi * (i - 1)
 
         if idle:
-            pos = nx.spring_layout(gs, seed=43)
+            pos = nx.spring_layout(g_sub, seed=43)
         else:
-            pos = risk_elevation_layout(gs, alpha=alpha, seed=43, iterations=iterations)
+            pos = risk_elevation_layout(g_sub, alpha=alpha, seed=43, iterations=iterations)
 
         if risk_mean is None:
             pos = normalize_coordinates(pos, diam_xy=d_xy, diam_z=d_z)
@@ -300,23 +300,24 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
             pos, risk_mean, risk_cov = normalize_coordinates(pos, risk_mean=risk_mean, risk_cov=risk_cov, diam_xy=d_xy,
                                                              diam_z=d_z)
 
-        for node in gs.nodes:
+        for node in g_sub.nodes:
             x, y = pos[node] * scale_cluster
             if i == 0:
                 pos_pie[node] = np.array([x, y])
             else:
                 pos_pie[node] = np.array(polar2cartesian(r + y, np.pi / 2 - (x / d_xy * phi + theta_i), units='rad'))
-            node_colors.append(cmap(i / n_cluster))
+            node_colors[node] = cmap(i / n_cluster)
 
-    gt = gr.subgraph(list(pos_pie.keys())) # Reordering nodes due to layout
+    g_out = g_relabeled.subgraph(entity_names)  # Reordering nodes according to original naming
     if plot_bool:
         fig, ax = plt.subplots(figsize=(10, 6))
-        widths = [gt[u][v]['weight'] for u, v in gt.edges]
-        nx.draw(gt, pos_pie, with_labels=with_labels, width=widths, ax=ax, node_color=node_colors)
+        widths = [g_out[u][v]['weight'] for u, v in g_out.edges]
+        colors = [node_colors[name] for name in entity_names]
+        nx.draw(g_out, pos_pie, with_labels=with_labels, width=widths, ax=ax, node_color=colors)
     if risk_mean is None:
-        return pos_pie, node_colors, r, gt, clus_assgn
+        return pos_pie, node_colors, r, g_out, clus_assgn
     else:
-        return pos_pie, risk_mean, risk_cov, node_colors, r, gt, clus_assgn
+        return pos_pie, risk_mean, risk_cov, node_colors, r, g_out, clus_assgn
 
 
 # --------------------------------------------------------------------------------

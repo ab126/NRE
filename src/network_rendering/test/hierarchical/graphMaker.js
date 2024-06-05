@@ -5,16 +5,15 @@ export const color1 = new THREE.Color(44, 246, 4);
 export const color2 = new THREE.Color(246, 4, 4);
 
 // Makes and returns the entity Group
-export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_mean, entityColors, clusAssignment, extras, sizeMult=.5, colorWithRisks=true){
+export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, funcEdges, riskArr, entityColors, clusAssignment, extras, sizeMult=.5, colorWithRisks=true){
     
     const entityClustersGroup = new THREE.Group(); // Center of group is mean center of elements
     const nMembers = [];
     const clusCenters = [];    
     const entityIndexInClus = [];
 
-    const nEntities = Object.keys(pos).length;
+    const nEntities = posArr.length;
     const nodeColors = new Float32Array( nEntities * 4 );
-    const nodePosArray = Array(nEntities);
     const degrees = Array(nEntities);
     
     for ( let j = 0; j < extras.n_cluster; j++){
@@ -24,12 +23,11 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
     }
 
     for ( let i = 0, clr, t, entityName; i < nEntities; i++ ) {
-        entityName = Object.keys(pos)[i];
+        entityName = namesArr[i];
 
-        nodePosArray[i] = pos[entityName];
         degrees[i] = funcEdges[i].reduce((acc, val) => acc + val );
 
-        t = risk_mean[entityName] / extras.diam_z > 0 ? risk_mean[entityName] / extras.diam_z: 0;
+        t = riskArr[i] / extras.diam_z > 0 ? riskArr[i] / extras.diam_z: 0;
         clr = colormapLinear(color1, color2, t);
 
         nodeColors[ i * 4 ] = colorWithRisks ? clr.r / 256 : entityColors[entityName][0];
@@ -41,14 +39,12 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
     const minDeg = Math.min(...degrees);
     const maxDeg = Math.max(...degrees);
     const nodeSizes = Array(nEntities);
-
-    
     
     // Compute Cluster Centers & nMembers
     for ( let i = 0, entityName; i < nEntities; i ++ ) {
-        entityName = Object.keys(pos)[i];         
+        entityName = namesArr[i];       
         nMembers[ clusAssignment[entityName] ] += 1;
-        clusCenters[ clusAssignment[entityName] ].add( new THREE.Vector3(nodePosArray[i][0], nodePosArray[i][1], 0));    
+        clusCenters[ clusAssignment[entityName] ].add( new THREE.Vector3(posArr[i][0], posArr[i][1], 0));    
     }
 
 
@@ -60,7 +56,7 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
     // Add entities to the entityClusterGroup
     for ( let i = 0, entityName, sizeScale, entitySampleMaterial, entity; i < nEntities; i ++ ){
 
-        entityName = Object.keys(pos)[i];      
+        entityName = namesArr[i];       
         sizeScale = 1 + sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);
         entitySampleMaterial = new THREE.MeshPhongMaterial({
             color:'#000000',
@@ -78,7 +74,7 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
         //entity.rotateX(Math.PI /2);
 
         let clusIndex = clusAssignment[entityName];
-        entity.position.set(nodePosArray[i][0], nodePosArray[i][1], 0);
+        entity.position.set(posArr[i][0], posArr[i][1], 0);
         entity.position.add( clusCenters[ clusIndex].clone().negate()  );
         entity.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entity.name = entityName;
@@ -96,9 +92,10 @@ export function makeNodes(entityGeometry, routerGeometry,  pos, funcEdges, risk_
 }
 
 // Makes and returns the connectivity edges mesh object
-export function makeConnectivityEdges(edgeConnectivityMaterial, pos, funcEdges, risk_mean){
+export function makeConnectivityEdges(edgeConnectivityMaterial, nodePosArr, edgesArr){
 
-    const [edgePos, edgeColors] = makeAllEdges( pos, funcEdges, risk_mean, false);
+    const edgePos = nodePos2AllEdgePos(nodePosArr)
+    const edgeColors = nodePos2EdgeColor(edgesArr);
 
     const edgeConnectivityGeometry = new THREE.BufferGeometry();
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
@@ -107,93 +104,17 @@ export function makeConnectivityEdges(edgeConnectivityMaterial, pos, funcEdges, 
     const edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     
     return edgeConnectivity
-    
-}
-
-// TODO: Might not need makers using pos
-/**
- * Makes edge defining points from functional connectivity edge array
- * @param {*} pos Object whose fields are entity ids with [pos_x, pos_y] array describing 2D position
- * @param {*} edges Weight Matrix of normalized edge weights
- * @param {*} elavate If true, elavates the entities according the mean value of their risks in z direction
- * @returns [edgeConnectivityPositions, edgeColors]
- *  edgeConnectivityPositions: Float32Array of source position coordinates and destination  position coordinates
- *  edgeColors: Float32Array of RGBA values of edges
- */
-export function makeAllEdges(pos, edges, risk, elavate) {
-    const nNodes = Object.keys(pos).length;
-    const edgePositions = new Float32Array( 3 * 2 * nNodes * (nNodes - 1) );
-    const edgeColors = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
-
-    for (let i = 0; i < nNodes ; i++) {
-
-        for (let j = 0; j < nNodes ; j++) {
-
-            if (j == i){
-                continue;
-            }
-            let k = i * nNodes + j;
-            let src = Object.keys(pos)[i];
-            let dst = Object.keys(pos)[j];
-
-            edgePositions[ 6 * k ] = pos[src][0]; 
-            edgePositions[ 6 * k + 1] = pos[src][1];
-            edgePositions[ 6 * k + 2] = elavate ? risk[src] : 0;
-
-            edgeColors[ 8 * k ] = (edges[i][j])** (1/3) * 255 ; 
-            edgeColors[ 8 * k + 1] = 0;
-            edgeColors[ 8 * k + 2] = 0;
-            edgeColors[ 8 * k + 3] = (edges[i][j]) ** (3) * 255;
-
-            edgePositions[ 6 * k + 3] = pos[dst][0]; 
-            edgePositions[ 6 * k + 4]  = pos[dst][1];
-            edgePositions[ 6 * k + 5]  = elavate ? risk[dst] : 0;
-
-            edgeColors[ 8 * k + 4] = edgeColors[ 8 * k ]; 
-            edgeColors[ 8 * k + 5] = edgeColors[ 8 * k + 1];
-            edgeColors[ 8 * k + 6] = edgeColors[ 8 * k + 2];
-            edgeColors[ 8 * k + 7] = edgeColors[ 8 * k + 3];
-        }
-    }
-    return [edgePositions, edgeColors];
 }
 
 // Makes and returns the topology edges mesh object
-export function makeTopologyEdges(edgeTopologyMaterial, pos, edgeList){
+export function makeTopologyEdges(edgeTopologyMaterial, nodePosArr, edgeList, indDict){
 
-    const edgePositions = makeEdgePositions(edgeList, pos, false);
+    const edgePositions = nodePos2EdgePos(nodePosArr, edgeList, indDict)
 
     const edgeTopologyGeometry = new THREE.BufferGeometry();
     edgeTopologyGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePositions, 3 ) );
     
-    return new THREE.LineSegments( edgeTopologyGeometry, edgeTopologyMaterial );
-    
-}
-
-/**
- * Makes edge defining points
- * @param {*} src Source entity
- * @param {*} dst Destination entity
- */
-function makeEdgePositions(edgeList, pos, elavate){
-    const nEdges = edgeList.length
-    const edgePositions = new Float32Array( nEdges * 2 * 3 );
-    let src, dst;
-
-    for (let i = 0; i < nEdges; i++) {
-
-        [src, dst] = edgeList[i];
-
-        edgePositions[ 6 * i ] = pos[src][0]; 
-        edgePositions[ 6 * i + 1] = pos[src][1];
-        edgePositions[ 6 * i + 2] = elavate ? risk_mean[src] : 0;
-
-        edgePositions[ 6 * i + 3] = pos[dst][0]; 
-        edgePositions[ 6 * i + 4] = pos[dst][1];
-        edgePositions[ 6 * i + 5] = elavate ? risk_mean[dst] : 0;
-
-    }
-    return edgePositions
+    return new THREE.LineSegments( edgeTopologyGeometry, edgeTopologyMaterial );    
 }
 
 // For altering Positions
@@ -248,6 +169,35 @@ function nodePos2AllEdgePos(nodePosArr){
         }
     }
     return edgePos;
+}
+
+// Returns edge colors buffer from node position array
+function nodePos2EdgeColor(edgesArr){
+    const nNodes = edgesArr.length;
+    const edgeColor = new Float32Array( 4 * 2 * nNodes * (nNodes - 1) );
+
+    for (let i = 0; i < nNodes ; i++) {
+
+        for (let j = 0, k; j < nNodes ; j++) {
+
+            if (j == i){
+                continue;
+            }
+
+            k = i * nNodes + j;
+
+            edgeColor[ 8 * k ] = (edgesArr[i][j])** (1/3) * 255 ; 
+            edgeColor[ 8 * k + 1] = 0;
+            edgeColor[ 8 * k + 2] = 0;
+            edgeColor[ 8 * k + 3] = (edgesArr[i][j]) ** (3) * 255;
+
+            edgeColor[ 8 * k + 4] = edgeColor[ 8 * k ]; 
+            edgeColor[ 8 * k + 5] = edgeColor[ 8 * k + 1];
+            edgeColor[ 8 * k + 6] = edgeColor[ 8 * k + 2];
+            edgeColor[ 8 * k + 7] = edgeColor[ 8 * k + 3];
+        }
+    }
+    return edgeColor
 }
 
 // Returns edge position buffer from node position array

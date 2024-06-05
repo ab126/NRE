@@ -83,16 +83,16 @@ def apply_spec_clus(mat_f, node_names, n_clus, plot_bool=True, fontsize=24, seed
     all_clusters = np.unique(all_labels)
 
     # Reordered g
-    gr = nx.Graph()
-    gr.add_nodes_from(all_nodes)
+    g_relabeled = nx.Graph()
+    g_relabeled.add_nodes_from(all_nodes)
     g_data = [(u, v, d['weight']) for (u, v, d) in g.edges(data=True)]
-    gr.add_weighted_edges_from(g_data)
+    g_relabeled.add_weighted_edges_from(g_data)
 
     if plot_bool:
         plt.rcParams.update({'font.size': fontsize})
         # Rendering Clusters
         plt.figure(figsize=(10, 10))
-        plt.imshow(nx.adjacency_matrix(gr).todense(), interpolation='nearest')
+        plt.imshow(nx.adjacency_matrix(g_relabeled).todense(), interpolation='nearest')
         plt.colorbar()
         cm_strs = ['Reds', 'Reds']
         for i, cluster in enumerate(all_clusters):
@@ -104,7 +104,7 @@ def apply_spec_clus(mat_f, node_names, n_clus, plot_bool=True, fontsize=24, seed
             plt.imshow(masked_array, cmap=cmap, alpha=.5)
         plt.show()
         plt.rcParams.update({'font.size': 10})
-    return gr, all_labels, all_clusters
+    return g_relabeled, all_labels, all_clusters
 
 
 def get_graph_clus(gr, new_labels, clusters, i, plot_bool=True, fontsize=18):

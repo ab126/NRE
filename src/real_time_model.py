@@ -26,6 +26,12 @@ class NetworkModel:
         self.mat_p = mat_p_init
         self.mat_q = mat_q
 
+    def normalize_risks(self):
+        """ Map the risks to [0, 1] range """
+        scale = self.mat_x.max() / 2
+        self.mat_x = self.mat_x / scale
+        self.mat_p = self.mat_p / scale ** 2
+
     # TODO: Make compatible with lower level class ConnectivityUnit.update_new_tick
     def update_new_tick(self, df_conn, measurement=None, mat_h=None, mat_r=None, keep_unit=False, relief_factor=0.6,
                         forget_factor=0.8, **kwargs):
