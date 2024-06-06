@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fontManager} from '../legend/legendMaker.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import TWEEN from '@tweenjs/tween.js'
 
 
 let persCamera, camera, cameraHelper, scene, renderer, stats;
@@ -54,14 +55,14 @@ const edgeConnectivityMaterial = new THREE.LineBasicMaterial( {
 
 
 const effectController = {
-    showConnectivity: true
+    showConnectivity: true,
+    animateCamera: false
 };
 
 // Read planar positions
 //const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
 let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
 const nNodes = Object.keys(pos).length;
-console.log(risk)
 
 initGUI();
 init();
@@ -85,7 +86,7 @@ function initGUI(){
 
     gui.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
 
-        edgeConnectivity.visible = value
+        edgeConnectivity.visible = value;
 
     } );
 
@@ -138,9 +139,7 @@ function init(){
     plane.position.z = -0.1
     scene.add( plane );
 
-    // Cameras
-    
-    
+    // Cameras    
     camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
     camera.position.set(0, -15, 2);
     camera.lookAt(plane.position);
@@ -150,6 +149,7 @@ function init(){
 
     persCamera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
     persCamera.position.set(0, 0, 4);
+    console.log(persCamera.rotation);
     scene.add(persCamera);
 
     cameraHelper = new THREE.CameraHelper( persCamera );
@@ -185,22 +185,37 @@ function init(){
         }  );
         geometrySubTitle.scale(1, 1, .005); 
         geometrySubTitle.center();
-        
         greeter = new THREE.Mesh( geometryTitle, liteMat );
+        
         const textSubTitle = new THREE.Mesh( geometrySubTitle, liteMat );
         textSubTitle.translateY( -fontSize * 1.4)
         greeter.add(textSubTitle);
+
+        const geometryDesc = new TextGeometry( 'Click Anywhere'.italics(), { 
+            font: font,    
+            size: fontSize/8,
+            curveSegments: 3,
+            bevelEnabled: false,
+        }  );
+        geometryDesc.scale(1, 1, .002); 
+        geometryDesc.center();
+        
+        const textDesc = new THREE.Mesh( geometryDesc, liteMat );
+        textDesc.translateY( -fontSize * 2.1)
+        greeter.add(textDesc);
+
 
         greeter.rotateX( Math.PI / 2);
         greeter.position.set(0, 7, 20);
         scene.add(greeter);
 
-        persCamera.position.set(0, -7, 20);
-        //persCamera.lookAt(greeter);
-
+        persCamera.position.set(0, -15, 20);
+        persCamera.lookAt(greeter.position);
+        persCamera.position.set(0, -15, 15)
+        console.log(greeter.position);
     } );
-    //fm.addFont("NRE", [0, -fontSize/2, 4], liteMat, scene, fontSize);
-    
+
+    document.addEventListener('click', panToPlane);
 
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
@@ -274,15 +289,32 @@ function init(){
     const edgeConnectivityGeometry = new THREE.BufferGeometry();
     edgeConnectivityGeometry.setAttribute( 'position', new THREE.BufferAttribute( edgePos, 3 ) );
     edgeConnectivityGeometry.setAttribute( 'color', new THREE.Uint8BufferAttribute( edgeColors, 4, true ) );
-    
-    
 
     edgeConnectivity = new THREE.LineSegments( edgeConnectivityGeometry, edgeConnectivityMaterial );
     scene.add( edgeConnectivity );
     edgeConnectivity.visible = effectController.showConnectivity;
 
-    const controls = new OrbitControls( persCamera, renderer.domElement );   
-    console.log(edgeConnectivity);
+    //const controls = new OrbitControls( persCamera, renderer.domElement );   
+    //controls.target.set(0, 0, 0);
+}
+
+// Pans the camera to the initial plane
+function panToPlane() {
+    // Create a tweens
+    const myEasing = TWEEN.Easing.Sinusoidal.In;
+
+    new TWEEN.Tween(persCamera.position).to({
+        x: 0,
+        y: 0,
+        z: 4
+    }, 1000).easing(myEasing).start();
+
+    new TWEEN.Tween(persCamera.rotation).to({
+        x: 0,
+    }, 1000).easing(myEasing).start();        
+    persCamera.lookAt(0, 0, 0);
+
+    document.removeEventListener('click', panToPlane);
 }
 
 function onWindowResize() {
@@ -396,6 +428,8 @@ function animate() {
       
     requestAnimationFrame( animate );
 
+    TWEEN.update();
+
 	render();    
 
     stats.update();
@@ -404,7 +438,6 @@ function animate() {
 function render() {
 
     uniforms.time.value += 0.01;
-    //console.log(uniforms)
     
 
     cameraHelper.visible = true;
@@ -414,7 +447,6 @@ function render() {
     renderer.render( scene, camera );
 
     cameraHelper.visible = false;
-
     renderer.setClearColor( 0x000000, 1 );
     renderer.setScissor( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);
     renderer.setViewport( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);

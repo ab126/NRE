@@ -29,7 +29,7 @@ def start_stream(ws, df_conn, entity_names, window_type='conn'):
     ff = 0.5
     rf = 0.7
     display_time = 2  # Amount of time the graph is displayed on the rendering end
-    conn_size, graph_conn_size = 3, 15
+    conn_size, graph_conn_size = 3, 150
 
     for _ in range(1000):  # For x runs
 

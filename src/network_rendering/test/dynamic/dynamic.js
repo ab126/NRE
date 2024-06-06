@@ -91,7 +91,6 @@ init();
 maxLabelEntity = labelMaxRisk(riskArr, maxLabelEntity, clusterGroup);
 animate();
 console.log(clusterGroup);
-console.log(namesArr)
 
 // Message Queue
 function connectWebSocket(){
@@ -124,7 +123,7 @@ function connectWebSocket(){
 
         //console.log(funcEdges);
         //console.log(topologyEdges);
-        console.log(riskArr);
+        //console.log(riskArr);
 
         // Add to HTML
         const para = document.createElement("p");
