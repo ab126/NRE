@@ -7,6 +7,7 @@ import time
 import logging
 from websocket_server import WebsocketServer
 
+from src.network_connectivity import get_all_entities
 from src.preprocess import preprocess_df
 from src.real_time_model import NetworkModel
 from src.safe_routing import communication_graph_from_df
@@ -23,7 +24,8 @@ def start_web_socket_server():
 
 
 # Sets up the server and starts streaming data
-def start_stream(ws, df_conn, entity_names, window_type='conn'):
+def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=False, src_id_col=' Source IP',
+                 dst_id_col=' Destination IP'):
     n_entities = len(entity_names)
     t_sync, t_graph = .5, 4  # sec 2,5 00
     ff = 0.5
@@ -33,7 +35,11 @@ def start_stream(ws, df_conn, entity_names, window_type='conn'):
 
     for _ in range(1000):  # For x runs
 
-        nm = NetworkModel(entity_names=entity_names, mat_x_init=np.ones(n_entities), mat_p_init=np.eye(n_entities))
+        if grow_entities:
+            nm = NetworkModel()
+        else:
+            nm = NetworkModel(entity_names=entity_names, mat_x_init=np.ones(n_entities), mat_p_init=np.eye(n_entities))
+
         date_col = ' Timestamp'
         end_of_df = False
         start_of_df = True
@@ -54,7 +60,7 @@ def start_stream(ws, df_conn, entity_names, window_type='conn'):
         n_flows = 0
         while end_of_df is False:
 
-            if start_of_df:  # Initial Run
+            if start_of_df and not grow_entities:  # Initial Run
                 edges_list = []
                 start_of_df = False
             else:
@@ -76,23 +82,34 @@ def start_stream(ws, df_conn, entity_names, window_type='conn'):
                 print("Graph #" + str(i))
                 print(nm.entity_names)
 
+                if grow_entities:
+                    curr_entities = get_all_entities(temp_df, src_id_col=src_id_col, dst_id_col=dst_id_col)
+                    nm.add_entities(curr_entities)
                 # try:
-                nm.update_new_tick(temp_df, conn_param='NPR', sync_window_size=t_sync, window_type=window_type,
-                                   conn_size=conn_size, keep_unit=True, forget_factor=ff, relief_factor=rf)
+                nm.update_new_tick(temp_df, conn_param='NPR', sync_window_size=t_sync,
+                                   window_type=window_type, conn_size=conn_size, keep_unit=True, forget_factor=ff,
+                                   relief_factor=rf)
                 # except AssertionError:
                 # print(AssertionError)
                 # break
                 nm.normalize_risks()
 
-                # Send the results
-                g_topo = communication_graph_from_df(temp_df, entity_names=entity_names, keep_outsiders=False)
+                g_topo = communication_graph_from_df(temp_df, entity_names=nm.entity_names, keep_outsiders=False)
                 edges_list = list(g_topo.edges)
                 n_flows = temp_df.shape[0]
 
-            json_string = json.dumps({'names': nm.entity_names, 'funcEdges': nm.mat_f.tolist(),
-                                      'riskArr': nm.mat_x.tolist(), 'riskCov': nm.mat_p.tolist(),
-                                      'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
-                                      'topologyEdges': edges_list})
+            # Send the results
+            if grow_entities:
+
+                json_string = json.dumps({'names': nm.entity_names, 'funcEdges': nm.mat_f.tolist(),
+                                          'riskArr': nm.mat_x.tolist(), 'riskCov': nm.mat_p.tolist(),
+                                          'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
+                                          'topologyEdges': edges_list})
+            else:
+                json_string = json.dumps({'names': nm.entity_names, 'funcEdges': nm.mat_f.tolist(),
+                                          'riskArr': nm.mat_x.tolist(), 'riskCov': nm.mat_p.tolist(),
+                                          'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
+                                          'topologyEdges': edges_list})
 
             #
             try:
