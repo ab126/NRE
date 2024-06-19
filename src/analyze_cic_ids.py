@@ -1,3 +1,5 @@
+import warnings
+
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -68,7 +70,7 @@ def flow_data_parser(df, entity_names=None, feat_cols=(' Total Fwd Packets',), d
     :param kwargs: Dummy variables to match NRE parameters
 
     :return: flow_data, labels, label_counts, flow_labels
-        flow_data: The list of group of flows in the same window
+        flow_data: The list of features of windowed flows in the same window
         labels: list[str]: List of Network State labels of the respective group of flows. Contains 'Empty' label if too few flows
             are present in the respective time window
         label_counts: List of flow counts of the respective group of flows
@@ -130,7 +132,7 @@ def _form_xy_ml(flow_data, labels, benign_label='BENIGN', test_size=None, seed=N
     # Form data matrices in accordance w/ windowing
     n_feats = len(flow_data[0][0])
     ind = np.array(labels) != 'Empty'
-    x_win = [win_list for i, win_list in enumerate(flow_data) if ind[i]]  # flows grouped by windows
+    x_win = [win_list for i, win_list in enumerate(flow_data) if ind[i]]  # non-empty flows grouped by windows
     y_win = np.array(labels)[ind]
     y_win = np.array([-1 if val == benign_label else 1 for val in y_win])
 
@@ -165,7 +167,7 @@ def _form_xy_ml(flow_data, labels, benign_label='BENIGN', test_size=None, seed=N
 
 def flow_based_classification(df, models, test_df=None, feat_cols=(' Total Fwd Packets', ' Total Backward Packets'),
                               benign_label='BENIGN', labelling_opt='attacks first', standardize=False, seed=None,
-                              test_size=0.33, roc_curves=None, **kwargs):
+                              test_size=0.33, roc_curves=None, warn=True, **kwargs):
     """
     Binary classification performance of flow-based classifier. Learns decision function on flows and
     then casts a majority vote on a window of flows for state inference (same windows as graph). For attack-first labeling
@@ -268,6 +270,11 @@ def flow_based_classification(df, models, test_df=None, feat_cols=(' Total Fwd P
     df_model['Recall'] = recall.values()
     df_model['Balanced Accuracy'] = b_acc.values()
     df_model['f1'] = f1.values()
+
+    if warn:
+        warnings.warn('Reported results are not fully representative since thresholding is not implemented for the ' +
+                      'flow_based_classification function directly. Use the roc_curves parameters to gauge the' +
+                      ' performance instead.')
 
     return df_model
 
@@ -412,7 +419,8 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
             {cic_conn_param_specs[conn_param]['src_feature_col'], cic_conn_param_specs[conn_param]['dst_feature_col']})
         df_flow = flow_based_classification(df, models, entity_names=flow_based_entity_names_param,
                                             feat_cols=feat_cols, t_graph=t_graph, roc_curves=flow_based_curves,
-                                            time_scale=time_scale, standardize=standardize, seed=seed)
+                                            time_scale=time_scale, standardize=standardize, seed=seed,
+                                            warn=not best_op_point)
         if best_op_point:
             df_flow = df_flow.loc[:, ['Balanced Accuracy']]
             for key in flow_based_curves:
@@ -454,4 +462,3 @@ def plot_perf_comparison(all_df, title='', perf_metric='Balanced Accuracy', peak
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     return plt.gcf()
-
