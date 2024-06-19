@@ -19,7 +19,7 @@ def polar2cartesian(r, theta, units='deg'):
     return r * np.cos(theta), r * np.sin(theta)
 
 
-def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, dy=1, n_points=1000, plot=True,
+def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, dy=1, n_points=1000, plot=True, y_max=3,
                         show_names=True, label_size=8, paths_highlight=None):
     """
     Depicts the network according to the calculated distances to route from source to every other entity. Fits the
@@ -48,38 +48,41 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
     idx_prev = -1
     fig, ax = plt.subplots(figsize=(9, 6))
     pos = {}
-    max_num = 0
-    x_curs = []
+    max_num = np.max(counts)
+    x_layers = []
     for i, node in enumerate(distances.keys()):
         idx = indices[i]
         num = counts[indices[i]]  # Number of same distance entities
-        max_num = num if num > max_num else max_num
+        ddy = 1 if num == 1 else y_max * 2 / (num - 1)
 
         # Update coordinates
-        if idx != idx_prev:
+        if idx != idx_prev:  # New layer
             if num != 1:
-                y_init = - (num - 1) / 2 * dy
-            elif i == 0 or i == len(distances) - 1:
+                # y_init = - (num - 1) / 2 * dy
+                y_init = -y_max
+            elif i == 0 or i == len(distances) - 1:  # First or last entity
                 y_init = 0
-            else:
-                y_init = (-1) ** (i + 1) * dy / 2
+            else:  # Single entity in middle layers
+                # y_init = (-1) ** (i + 1) * dy / 2
+                y_init = (-1) ** (i + 1) * y_max / 2
             x_cur, y_cur = x_cur + dx, y_init
-            x_curs.append(x_cur)
+            x_layers.append(x_cur)
         else:
-            x_cur, y_cur = x_cur, y_cur + dy
+            # x_cur, y_cur = x_cur, y_cur + dy
+            x_cur, y_cur = x_cur, y_cur + ddy
         pos[node] = np.array([x_cur, y_cur])
         idx_prev = idx
 
     # Plot lines
     ys = np.linspace(-(max_num / 2 + 0.5), max_num / 2 + 0.5, n_points) * dy
-    for x_cur in x_curs:
+    for x_cur in x_layers:
         xs = np.array([x_cur for _ in ys])
         ax.plot(xs, ys, 'tab:gray', alpha=.2)
 
     # Plot x axis
     y_x_ax = -(max_num / 2 + 1)
-    ax.plot([x_curs[0], x_curs[-1]], [y_x_ax, y_x_ax], color="k")
-    ax.plot(x_curs[-1], y_x_ax, ls="", marker=">", ms=5, color="k", clip_on=False)
+    ax.plot([x_layers[0], x_layers[-1]], [y_x_ax, y_x_ax], color="k")
+    ax.plot(x_layers[-1], y_x_ax, ls="", marker=">", ms=5, color="k", clip_on=False)
 
     # Plot the rest
     cmap = plt.cm.YlOrRd  # plt.cm.Reds
@@ -129,7 +132,7 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
     # Set x ticks
     ax.spines['top'].set_visible(True)
     ax.set_xlabel('Increasing Risk Levels')
-    ax.get_xaxis().set_ticks(ticks=x_curs)
+    ax.get_xaxis().set_ticks(ticks=x_layers)
 
     if plot:
         plt.show()
@@ -275,7 +278,7 @@ def pie_layout(mat_f, entity_names, n_cluster, risk_mean=None, risk_cov=None, d_
     g_relabeled, new_labels, clusters = apply_spec_clus(mat_f, entity_names, n_cluster, plot_bool=False)
     clus_assgn = {node: int(i) for node, i in zip(g_relabeled.nodes, new_labels)}
 
-    phi = 2 * np.pi / (n_cluster - 1) if n_cluster > 1 else 2 * np.pi # Constant angle of pie given for each cluster
+    phi = 2 * np.pi / (n_cluster - 1) if n_cluster > 1 else 2 * np.pi  # Constant angle of pie given for each cluster
     r = r_const * d_xy / phi
     scale_cluster = 0.8
     cmap = plt.get_cmap('cool')
@@ -513,7 +516,7 @@ def risk_elevation_layout(
             for i in range(nnodes):
                 for j in range(nnodes):
                     assert dists[i][0] == list(g.nodes)[i], "Order of nodes due to nx.shortest_path_length is altered"
-                    #print(dists)
+                    # print(dists)
                     mat_d[i, j] = dists[i][1][list(g.nodes)[j]]
 
             pos = _david_force_directed(

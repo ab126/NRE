@@ -189,6 +189,12 @@ def flow_based_classification(df, models, test_df=None, feat_cols=(' Total Fwd P
         df_model: DataFrame containing classification performance of all models using flow-based approach
     """
 
+    if feat_cols is None:
+        feat_cols = ('Active Mean', ' Flow Duration', 'Flow Bytes/s', ' Fwd Header Length', ' Bwd Header Length',
+                     'Idle Mean', ' act_data_pkt_fwd', ' Total Fwd Packets', ' Total Backward Packets', ' Fwd IAT Mean',
+                     ' Bwd IAT Mean', ' Fwd Packet Length Mean', ' Bwd Packet Length Mean', ' Source Port',
+                     ' Destination Port', ' Protocol', ' Bwd IAT Mean', ' Fwd IAT Mean')
+
     flow_data, labels, label_counts = flow_data_parser(df, feat_cols=feat_cols, benign_label=benign_label,
                                                        labelling_opt=labelling_opt, **kwargs)
 
