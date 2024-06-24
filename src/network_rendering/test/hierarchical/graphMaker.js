@@ -47,7 +47,6 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
         clusCenters[ clusAssignment[entityName] ].add( new THREE.Vector3(posArr[i][0], posArr[i][1], 0));    
     }
 
-
     // Center the Group 
     for ( let j=0; j < clusCenters.length; j++){
         clusCenters[j].divideScalar(nMembers[j]);
@@ -89,6 +88,71 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
     }
 
     return [entityClustersGroup, entityIndexInClus];
+}
+
+/**
+ * Add new entities to the existing ones
+ * 
+ * @param {*} entityClustersGroup 
+ * @param {*} newIdx Index that the new entities start
+ * @param {*} nodeGeometry Geometry of the new entities
+ * @param {*} namesArr Name array of all entities
+ * @param {*} posArr Position array of all entities
+ * @param {*} riskArr Risk array of all entities
+ * @param {*} diamXY Diameter in X and Y direction (assumed identical)
+ * @param {*} diamZ Diameter in Z direction
+ */
+export function addNodesSimple(entityClustersGroup,  newIdx, nodeGeometry, namesArr, posArr, riskArr, diamXY, diamZ){
+    
+    const entityIndexInClus = [];
+
+    const nEntities = namesArr.length;
+    const nodeColors = new Float32Array( (nEntities - newIdx) * 4 );
+    
+
+    for ( let k = 0, clr, t, entityName; k < nEntities - newIdx; k++ ) {
+        entityName = namesArr[k + newIdx];
+
+        t = riskArr[k + newIdx] > 0 ? riskArr[k + newIdx] / diamZ: 0;
+        clr = colormapLinear(color1, color2, t);
+
+        nodeColors[ k * 4 ] = clr.r / 256;
+        nodeColors[ k * 4 + 1] = clr.g / 256;
+        nodeColors[ k * 4 + 2] = clr.b / 256;
+        nodeColors[ k * 4 + 3] = 1;
+
+    }
+
+    // Compute Cluster Centers & nMembers
+    for ( let i = newIdx, entityName; i < nEntities; i ++ ) {
+        entityName = namesArr[i];       
+        posArr.push([Math.random() * diamXY - diamXY / 2, Math.random() * diamXY - diamXY / 2])
+    }
+
+
+    // Add entities to the entityClusterGroup
+    for ( let i = newIdx, k, entityName, sizeScale, entitySampleMaterial, entity; i < nEntities; i ++ ){
+        k = i - newIdx;
+        entityName = namesArr[i];       
+        entitySampleMaterial = new THREE.MeshPhongMaterial({
+            color:'#000000',
+            emissive:'#000000',
+            emissiveIntensity:1,
+            specular:'#ffffff',
+            shininess:30
+        });        
+
+        entity = new THREE.Mesh( nodeGeometry, entitySampleMaterial );
+
+        let clusIndex = 0;
+        entity.position.set(posArr[i][0], posArr[i][1], 0);
+        entity.material.color.setRGB(nodeColors[ 4 * k ], nodeColors[ 4 * k + 1], nodeColors[ 4 * k + 2]);
+        entity.name = entityName;
+
+        entityIndexInClus.push( entityClustersGroup.children[ clusIndex].children.length);
+        entityClustersGroup.children[ clusIndex].add( entity );
+
+    }
 }
 
 // Makes and returns the connectivity edges mesh object

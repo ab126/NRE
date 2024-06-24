@@ -24,8 +24,8 @@ class NetworkModel:
         self.entity_names = entity_names
         self.cu = ConnectivityUnit() # Only for debugging for now
         self.mat_f = np.eye(len(entity_names))
-        self.mat_x = np.zeros(0)
-        self.mat_p = np.eye(0)
+        self.mat_x = np.zeros(0) if mat_x_init is None else mat_x_init
+        self.mat_p = np.eye(0) if mat_p_init is None else mat_p_init
         self.mat_q = mat_q
 
     def normalize_risks(self):
@@ -37,10 +37,10 @@ class NetworkModel:
     def add_entities(self, entity_list):
         """ Adds from the list of entities. Added entities will have the mean of previous entity risk and uncorrelated
          covariance with mean old variance"""
-        new_entities = [name for name in entity_list if name not in self.entity_names]
-        new_risk = np.mean(self.mat_x)
-        new_var = np.mean(np.diag(self.mat_p))
         old_n = len(self.entity_names)
+        new_entities = [name for name in entity_list if name not in self.entity_names]
+        new_risk = np.mean(self.mat_x) if old_n != 0 else 1
+        new_var = np.mean(np.diag(self.mat_p)) if old_n != 0 else 1
 
         self.entity_names = self.entity_names + new_entities
         self.cu = ConnectivityUnit()
@@ -81,10 +81,8 @@ class NetworkModel:
 
         df = preprocess_df(df_conn, date_col=' Timestamp')
         cu = ConnectivityUnit()
-        if grow_entities:
-            cu.read_flows(df, **kwargs)
-        else:
-            cu.read_flows(df, entity_names=self.entity_names, **kwargs)
+
+        cu.read_flows(df, entity_names=self.entity_names, **kwargs)
         cu.fit_connectivity_model(method='cov', verbose=True)
 
         if keep_unit:  # Only for debugging
@@ -95,6 +93,7 @@ class NetworkModel:
                                                     mat_x_init=self.mat_x,
                                                     mat_p_init=self.mat_p, mat_q=self.mat_q, mat_r=mat_r, k_steps=1,
                                                     relief_factor=relief_factor, normalize=False)
+
 
     def partition_network(self):
         # TODO: """ Partitions the network into subnetworks for simplicity"""

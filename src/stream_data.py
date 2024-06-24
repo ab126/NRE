@@ -25,13 +25,10 @@ def start_web_socket_server():
 
 # Sets up the server and starts streaming data
 def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=False, src_id_col=' Source IP',
-                 dst_id_col=' Destination IP'):
+                 dst_id_col=' Destination IP', graph_conn_size=150, conn_size=3, t_graph=4, t_sync=0.5,
+                 forget_factor=0.5, relief_factor=0.7):
     n_entities = len(entity_names)
-    t_sync, t_graph = .5, 4  # sec 2,5 00
-    ff = 0.5
-    rf = 0.7
     display_time = 2  # Amount of time the graph is displayed on the rendering end
-    conn_size, graph_conn_size = 3, 150
 
     for _ in range(1000):  # For x runs
 
@@ -58,6 +55,7 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 
         ind = 0
         n_flows = 0
+        n_new = 0
         while end_of_df is False:
 
             if start_of_df and not grow_entities:  # Initial Run
@@ -80,15 +78,16 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 
                 i += 1
                 print("Graph #" + str(i))
-                print(nm.entity_names)
 
                 if grow_entities:
                     curr_entities = get_all_entities(temp_df, src_id_col=src_id_col, dst_id_col=dst_id_col)
+                    n_new = len([name for name in curr_entities if name not in nm.entity_names])
                     nm.add_entities(curr_entities)
                 # try:
                 nm.update_new_tick(temp_df, conn_param='NPR', sync_window_size=t_sync,
-                                   window_type=window_type, conn_size=conn_size, keep_unit=True, forget_factor=ff,
-                                   relief_factor=rf)
+                                   window_type=window_type, conn_size=conn_size, keep_unit=True,
+                                   forget_factor=forget_factor,
+                                   relief_factor=relief_factor)
                 # except AssertionError:
                 # print(AssertionError)
                 # break
@@ -100,16 +99,16 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 
             # Send the results
             if grow_entities:
-
                 json_string = json.dumps({'names': nm.entity_names, 'funcEdges': nm.mat_f.tolist(),
                                           'riskArr': nm.mat_x.tolist(), 'riskCov': nm.mat_p.tolist(),
                                           'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
-                                          'topologyEdges': edges_list})
+                                          'topologyEdges': edges_list, 'newEntities': n_new})
+                print(json_string)
             else:
                 json_string = json.dumps({'names': nm.entity_names, 'funcEdges': nm.mat_f.tolist(),
                                           'riskArr': nm.mat_x.tolist(), 'riskCov': nm.mat_p.tolist(),
                                           'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
-                                          'topologyEdges': edges_list})
+                                          'topologyEdges': edges_list, 'newEntities': n_new})
 
             #
             try:

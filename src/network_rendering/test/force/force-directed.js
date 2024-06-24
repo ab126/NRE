@@ -13,10 +13,10 @@ import * as tf from '@tensorflow/tfjs'
  */
 export function singleStepForceDirected(funcAdj, nodePos = null, t = null, diamXY = 1.3, minDist = 0.001, alpha=1, beta=0.2){
     
-    const nnodes = funcAdj.length;
-    const k = tf.sqrt(1/ nnodes).mul(diamXY).arraySync();
+    const nNodes = funcAdj.length;
+    const k = tf.sqrt(1/ nNodes).mul(diamXY).arraySync();
     if (nodePos == null){
-        nodePos = Array.from({length: nnodes}, () => Math.random() * diamXY - diamXY / 2 );
+        nodePos = Array.from({length: nNodes}, () => Math.random() * diamXY - diamXY / 2 );
     }
     if (t == null){
         t = diamXY * 0.1; // Temperatrue or max step size 

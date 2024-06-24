@@ -76,6 +76,7 @@ const indDict = {}; // Dictionary of {name:index}
 for (let i = 0; i < nNodes; i++) {
     indDict[namesArr[i]] = i;
 }
+let nNew;
 
 let stepSize = effectController.stepSize;
 let dt = stepSize / (effectController.maxIter + 1);
@@ -113,7 +114,8 @@ function connectWebSocket(){
         riskArr = obj.riskArr;
         riskCov = obj.riskCov;
         topologyEdges = obj.topologyEdges;
-
+        nNew = obj.newEntities;
+        console.log(obj)
 
 
         const streamNames = obj.names;
