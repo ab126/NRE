@@ -50,7 +50,7 @@ def split_df(df, ):
 
 def flow_data_parser(df, entity_names=None, feat_cols=(' Total Fwd Packets',), date_col=' Timestamp',
                      t_graph=100, time_scale='sec', label_col=' Label', labelling_opt='attacks first',
-                     benign_label='BENIGN', src_id_col=' Source IP', dst_id_col=' Destination IP', **kwargs):
+                     benign_label='BENIGN', src_id_col=' Source IP', dst_id_col=' Destination IP'):
     """
     Parses the connection data into a data matrix using time windows.
 
@@ -78,7 +78,7 @@ def flow_data_parser(df, entity_names=None, feat_cols=(' Total Fwd Packets',), d
     assert df.shape[0] > 0, "Source DataFrame is empty."
 
     if entity_names:
-        idx = df[src_id_col].isin(entity_names) | df[dst_id_col].isin(entity_names)
+        idx = df[src_id_col].isin(entity_names) & df[dst_id_col].isin(entity_names)
         df = df[idx].copy()
 
     flow_data = []
@@ -186,6 +186,7 @@ def flow_based_classification(df, models, test_df=None, feat_cols=(' Total Fwd P
     :param test_size: Portion of flow data used as test
     :param roc_curves: (only if plot_roc==True and smooth_roc==True) If given dictionary, adds the model roc_curves
     :param kwargs: flow_based_parser keyword arguments
+    :param warn: If True warn about limitations of printed results and redirect to roc_curves
 
     :return:
         df_model: DataFrame containing classification performance of all models using flow-based approach
@@ -235,6 +236,8 @@ def flow_based_classification(df, models, test_df=None, feat_cols=(' Total Fwd P
         y_win_predict = []
         scores = []
         ind = 0
+
+        # Decision Aggregation
         for n in n_flow_test:
             y_temp = y_flow_predict[ind: ind + n]
             vals, counts = np.unique(y_temp, return_counts=True)
@@ -243,7 +246,12 @@ def flow_based_classification(df, models, test_df=None, feat_cols=(' Total Fwd P
             pos_prob = counts[vals == 1][0] / n if len(counts[vals == 1]) > 0 else 0
             scores.append(pos_prob)
 
-            if labelling_opt == 'attacks first':
+            if labelling_opt == 'score':
+                ind2 = np.argwhere(vals == 1).flatten()
+                p = counts[ind2][0] / len(y_temp) if len(counts[ind2]) != 0 else 0
+                lbl = 1 if np.random.rand() < p else -1
+                y_win_predict.append(lbl)
+            elif labelling_opt == 'attacks first':
                 if 1 in vals:
                     y_win_predict.append(1)
                 else:
@@ -360,7 +368,7 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
 # TODO: Both parsers might not be synced
 def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_names_fb=None, conn_params=None,
                               confine_flow_based_entities=True, t_graph=100, sync_window_size=1, time_scale='sec',
-                              standardize=False, best_op_point=True, seed=None, **kwargs):
+                              standardize=False, best_op_point=True, seed=None, control=False, **kwargs):
     """
     Compares NRE method with common flow-based classifier among different connection parameters
 
@@ -380,6 +388,7 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
     :param best_op_point: If True, picks the operating point with the highest balanced accuracy and only audits balanced
         accuracy metric
     :param seed: If int, uses this seed for train test split
+    :param control: If True add the control for FBNSI method without confining entities
     :param kwargs: nre_classification kwargs
     :return all_df: Classification results as a DataFrame object
     """
@@ -435,6 +444,29 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
         df_flow['Method'] = ['Flow-Based Network State Inference' for _ in range(df_flow.shape[0])]
 
         all_df = pd.concat((all_df, df_flow, df_nre), ignore_index=True)
+
+        if control:
+            flow_based_curves_control = {}
+            df_flow_control = flow_based_classification(df, models, entity_names=None,
+                                                        feat_cols=feat_cols, t_graph=t_graph,
+                                                        roc_curves=flow_based_curves_control,
+                                                        time_scale=time_scale, standardize=standardize, seed=seed,
+                                                        warn=not best_op_point)
+            if best_op_point:
+                df_flow_control = df_flow_control.loc[:, ['Balanced Accuracy']]
+                for key in flow_based_curves_control:
+                    fpr, tpr = flow_based_curves_control[key]
+                    x_roc, y_roc = infer_roc(fpr, tpr)
+                    x_op, y_op, conv_bool = max_ba_operating_point(x_roc, y_roc)
+                    ba = get_ba_from_operating_point(x_op, y_op) if conv_bool else np.nan
+                    df_flow_control.loc[key, 'Balanced Accuracy'] = ba
+            df_flow_control['Connection Parameter'] = [conn_param_str for _ in range(df_flow_control.shape[0])]
+            df_flow_control['Classifier'] = df_flow_control.index
+            df_flow_control.index = np.arange(df_flow_control.shape[0])
+            df_flow_control['Method'] = ['Flow-Based Network State Inference Control' for _ in range(df_flow_control.shape[0])]
+
+            all_df = pd.concat((all_df, df_flow_control), ignore_index=True)
+
     return all_df
 
 
