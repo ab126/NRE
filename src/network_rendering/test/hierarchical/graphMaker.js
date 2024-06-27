@@ -102,14 +102,12 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
  * @param {*} diamXY Diameter in X and Y direction (assumed identical)
  * @param {*} diamZ Diameter in Z direction
  */
-export function addNodesSimple(entityClustersGroup,  newIdx, nodeGeometry, namesArr, posArr, riskArr, diamXY, diamZ){
+export function addNodesSimple(entityClustersGroup, clusMemberships, clusAssignments, entityIndexInClus, newIdx, nodeGeometry, namesArr, posArr, riskArr, diamXY, diamZ){
     
-    const entityIndexInClus = [];
-
     const nEntities = namesArr.length;
     const nodeColors = new Float32Array( (nEntities - newIdx) * 4 );
     
-
+    // Compute Node Colors
     for ( let k = 0, clr, t, entityName; k < nEntities - newIdx; k++ ) {
         entityName = namesArr[k + newIdx];
 
@@ -123,17 +121,16 @@ export function addNodesSimple(entityClustersGroup,  newIdx, nodeGeometry, names
 
     }
 
-    // Compute Cluster Centers & nMembers
+    // Compute Positions
     for ( let i = newIdx, entityName; i < nEntities; i ++ ) {
         entityName = namesArr[i];       
-        posArr.push([Math.random() * diamXY - diamXY / 2, Math.random() * diamXY - diamXY / 2])
+        posArr.push([Math.random() * diamXY - diamXY / 2, Math.random() * diamXY - diamXY / 2]);
     }
 
 
     // Add entities to the entityClusterGroup
-    for ( let i = newIdx, k, entityName, sizeScale, entitySampleMaterial, entity; i < nEntities; i ++ ){
-        k = i - newIdx;
-        entityName = namesArr[i];       
+    for ( let i = newIdx, k, entitySampleMaterial, entity; i < nEntities; i ++ ){
+        k = i - newIdx;     
         entitySampleMaterial = new THREE.MeshPhongMaterial({
             color:'#000000',
             emissive:'#000000',
@@ -147,11 +144,68 @@ export function addNodesSimple(entityClustersGroup,  newIdx, nodeGeometry, names
         let clusIndex = 0;
         entity.position.set(posArr[i][0], posArr[i][1], 0);
         entity.material.color.setRGB(nodeColors[ 4 * k ], nodeColors[ 4 * k + 1], nodeColors[ 4 * k + 2]);
-        entity.name = entityName;
+        entity.name = namesArr[i];
 
-        entityIndexInClus.push( entityClustersGroup.children[ clusIndex].children.length);
         entityClustersGroup.children[ clusIndex].add( entity );
+        clusMemberships[clusIndex].push(i);
+        clusAssignments[entity.name] = clusIndex;
+        entityIndexInClus[entity.name] = i;
+    }
+}
 
+/**
+ * Activate the already existing nodes in entityClustersGroup. Used when new entities are added to network of interest
+ * @param {*} entityClustersGroup 
+ * @param {*} newIdx Index that the new entities start
+ * @param {*} nodeGeometry Geometry of the new entities
+ * @param {*} namesArr Name array of all entities
+ * @param {*} posArr Position array of all entities
+ * @param {*} riskArr Risk array of all entities
+ * @param {*} diamXY Diameter in X and Y direction (assumed identical)
+ * @param {*} diamZ Diameter in Z direction
+ */
+export function activateNodes(entityClustersGroup, clusMemberships, clusAssignments, entityIndexInClus, indDict, activeNodes, newIdx, nodeGeometry, namesArr, posArr, riskArr, diamXY, diamZ) {
+
+    const nEntities = namesArr.length;
+    const nodeColors = new Float32Array( (nEntities - newIdx) * 4 );
+    
+    // Compute Node Colors
+    for ( let k = 0, clr, t, entityName; k < nEntities - newIdx; k++ ) {
+        entityName = namesArr[k + newIdx];
+
+        t = riskArr[k + newIdx] > 0 ? riskArr[k + newIdx] / diamZ: 0;
+        clr = colormapLinear(color1, color2, t);
+
+        nodeColors[ k * 4 ] = clr.r / 256;
+        nodeColors[ k * 4 + 1] = clr.g / 256;
+        nodeColors[ k * 4 + 2] = clr.b / 256;
+        nodeColors[ k * 4 + 3] = 1;
+
+    }
+
+    // Edit Positions
+    for ( let i = newIdx, entityName; i < nEntities; i ++ ) {
+        entityName = namesArr[i];       
+        posArr[i] = [Math.random() * diamXY - diamXY / 2, Math.random() * diamXY - diamXY / 2];
+    }
+
+    // Add entities to the entityClusterGroup
+    for ( let i = newIdx, k, sizeScale, entitySampleMaterial, entity; i < nEntities; i ++ ){
+        k = i - newIdx;
+
+        let clusIndex = 0;
+        entity = entityClustersGroup.children[ clusIndex].children[i]; 
+        //entity.geometry = nodeGeometry;
+        entity.position.set(posArr[i][0], posArr[i][1], 0);
+        entity.material.color.setRGB(nodeColors[ 4 * k ], nodeColors[ 4 * k + 1], nodeColors[ 4 * k + 2]);
+        entity.name = namesArr[i];
+        entity.visible = true;
+
+        clusMemberships[clusIndex][i] = i;
+        clusAssignments[entity.name] = clusIndex;
+        entityIndexInClus[entity.name] = i;
+        indDict[entity.name] = i;
+        activeNodes[clusIndex].push(i);
     }
 }
 
@@ -267,8 +321,11 @@ function nodePos2EdgeColor(edgesArr){
 // Returns edge position buffer from node position array
 function nodePos2EdgePos(nodePosArr, edgeList, indDict){
 
-    const nEdges = edgeList.length
+    const nEdges = edgeList.length;
     const edgePositions = new Float32Array( nEdges * 2 * 3 );
+    if (nEdges == 0){
+        return edgePositions;
+    }
 
     for (let k = 0, i, j, src, dst; k < nEdges; k++) {
 

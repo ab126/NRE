@@ -26,7 +26,7 @@ cic_conn_param_specs = {
     'Header Length': {'method': 'average', 'src_feature_col': ' Fwd Header Length',
                       'dst_feature_col': ' Bwd Header Length'},
     'Idle Time': {'method': 'average', 'src_feature_col': 'Idle Mean', 'dst_feature_col': 'Idle Mean'},
-    'Num Active Packets': {'method': 'total', 'src_feature_col': ' act_data_pkt_fwd',
+    'NAP': {'method': 'total', 'src_feature_col': ' act_data_pkt_fwd',
                            'dst_feature_col': ' act_data_pkt_fwd'},
     'NPS': {'method': 'total', 'src_feature_col': ' Total Fwd Packets',
             'dst_feature_col': ' Total Backward Packets'},  # Number of Packets Sent
@@ -35,7 +35,7 @@ cic_conn_param_specs = {
     'Packet Delay': {'method': 'average', 'src_feature_col': ' Fwd IAT Mean', 'dst_feature_col': ' Bwd IAT Mean'},
     'Packet Length': {'method': 'average', 'src_feature_col': ' Fwd Packet Length Mean',
                       'dst_feature_col': ' Bwd Packet Length Mean'},
-    'Port Num': {'method': 'last', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
+    'Port Number': {'method': 'last', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
     'Protocol': {'method': 'last', 'src_feature_col': ' Protocol', 'dst_feature_col': ' Protocol'},
     'Response Time': {'method': 'average', 'src_feature_col': ' Bwd IAT Mean', 'dst_feature_col': ' Fwd IAT Mean'}
 
