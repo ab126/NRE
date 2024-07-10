@@ -285,6 +285,7 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
         all_graphs: Collection of network state graphs
         labels: Labels of the network state according to the labelling scheme
         label_counts: List of labels counts dictionary per each graph
+        entity_names: Respective entity names of the graphs
         date_times: (Returned only if return_datetimes==True). List of datetimes used to start computing the graphs
         t_sim: (Returned only if timeit==True) List of running time spent for calculating each graph
     """
