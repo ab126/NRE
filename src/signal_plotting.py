@@ -99,107 +99,7 @@ def add_time_window_shades(ax, times, time_window, time_scale):
 
 
 def plot_combined_flow_signals_old(df, entities, time_window=10, time_scale='min', date_col=' Timestamp',
-                                   conn_param1='Activation', conn_param2='Num Packets Received'):
-    """Plots the figures depicting flows and two signals formed from them"""
-    idx = df[' Source IP'].isin(entities) | df[' Destination IP'].isin(entities)
-    t_df = df.loc[idx, :]
-    idx0 = t_df[' Source IP'].isin([entities[0]]) | t_df[' Destination IP'].isin([entities[0]])
-    idx_common = (t_df[' Source IP'].isin([entities[0]]) & t_df[' Destination IP'].isin([entities[1]])) | (
-            t_df[' Source IP'].isin([entities[1]]) & t_df[' Destination IP'].isin([entities[0]]))
-    cpy_df = t_df.loc[idx_common, :]
-    t_df = t_df.assign(Entity=idx0.apply(lambda x: 'Entity 1' if x is True else 'Entity 2'))
-    cpy_df = cpy_df.assign(Entity='Entity 2')
-    t_df = pd.concat((t_df, cpy_df), ignore_index=True)
-    t_df = t_df.sort_values(by=[date_col])
-
-    # 'Num Packets Rec'
-    nm = ConnectivityUnit()
-    nm.read_flows(t_df, conn_param=conn_param1, entity_names=list(entities), sync_window_size=time_window,
-                  time_scale=time_scale)
-    vec_num1 = nm.samples[:, 0]
-    vec_num2 = nm.samples[:, 1] - 0.05
-
-    # Activation
-    nm = ConnectivityUnit()
-    nm.read_flows(t_df, conn_param=conn_param2, entity_names=list(entities), sync_window_size=time_window,
-                  time_scale=time_scale)
-    vec_act1 = nm.samples[:, 0]
-    vec_act2 = nm.samples[:, 1]
-
-    times = []
-    t_df = t_df.sort_values(by=[date_col])
-    current_datetime = t_df.iloc[0][date_col]
-    last_datetime = t_df.iloc[-1][date_col]
-    while current_datetime <= last_datetime:
-        window, current_datetime = get_window(current_datetime, t_df, time_window=time_window, time_scale=time_scale)
-        times.append(current_datetime - datetime.timedelta(minutes=time_window / 2))
-
-    # Plotting
-    event_data = [t_df[t_df['Entity'] == 'Entity 1'].loc[:, date_col],
-                  t_df[t_df['Entity'] == 'Entity 2'].loc[:, date_col]]
-    colors = [f'C{i}' for i in range(2)]
-    fig, axs = plt.subplots(3, 1, gridspec_kw={'wspace': 0, 'hspace': 0})
-    fig.suptitle('Flows by Entities')
-    ax1, ax2, ax3 = axs
-    ax1 = plt.subplot(311)
-    # sns.scatterplot(data=t_df, x=' Timestamp', y='y', hue='Entity')
-    # sns.stripplot(data=t_df, x=' Timestamp', y='y', hue='Entity', ax=ax1)
-    ax1.eventplot(event_data, colors=colors, lineoffsets=[0, 2])
-    add_time_window_shades(ax1, times, time_window, time_scale)
-    # plt.xticks(rotation=45)
-
-    # ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.spines['bottom'].set_visible(False)
-    ax1.spines['left'].set_visible(False)
-    # ax1.get_xaxis().set_ticks([])
-    ax1.get_yaxis().set_ticks([])
-    ax1.set_ylabel('')
-    ax1.set_xlabel('Timestamps')
-    # ax1.set_title('Flows by Entities')
-    # ax1.legend(loc='upper right', bbox_to_anchor=(1.3, 0.65))
-    ax1.xaxis.tick_top()
-    ax1.xaxis.set_label_position('top')
-
-    ax2 = plt.subplot(312)
-    # sns.rugplot(data=t_df, x=' Timestamp', hue='Entity', height=.05, ax=ax2)
-    sns.lineplot(x=times, y=vec_num1, label='Entity 1', color='tab:blue', ax=ax2)
-    sns.lineplot(x=times, y=vec_num2, label='Entity 2', color='tab:orange', ax=ax2)
-    add_time_window_shades(ax2, times, time_window, time_scale)
-
-    # ax2.set_title(conn_param1)
-    ax2.spines['top'].set_visible(False)
-    ax2.spines['right'].set_visible(False)
-    # ax2.spines['bottom'].set_visible(False)
-    ax2.spines['left'].set_visible(False)
-    ax2.get_xaxis().set_ticks([])
-    ax2.set_ylabel(conn_param1)
-    ax2.set_xlabel('')
-    ax2.legend(loc='upper right', bbox_to_anchor=(1.3, 0.65))
-
-    ax3 = plt.subplot(313)
-    # sns.rugplot(data=t_df, x=' Timestamp', hue='Entity', height=.05, ax=ax3)
-    sns.lineplot(x=times, y=vec_act1, color='tab:blue', ax=ax3)
-    sns.lineplot(x=times, y=vec_act2, color='tab:orange', ax=ax3)
-    add_time_window_shades(ax3, times, time_window, time_scale)
-    # ax3.get_legend().remove()
-
-    # ax3.set_title(conn_param2)
-    # ax3.spines['top'].set_visible(False)
-    ax3.spines['right'].set_visible(False)
-    ax3.spines['bottom'].set_visible(False)
-    ax3.spines['left'].set_visible(False)
-    ax3.get_xaxis().set_ticks([])
-    ax3.set_ylabel(conn_param2)
-    ax3.set_xlabel('')
-    # ax3.legend()
-    # ax3.legend(loc='upper right', bbox_to_anchor=(1.3, 0.65))
-    # plt.xticks(rotation=45)
-    plt.tight_layout()
-
-
-def plot_combined_flow_signals(df, entities, time_window=10, time_scale='min', date_col=' Timestamp',
-                               conn_param1='Activation', conn_param2='NPR', str1=None, str2=None):
+                                   conn_param1='Activation', conn_param2='NPR', str1=None, str2=None):
     """Plots the figures depicting flows and two signals formed from them"""
     if str1 is None:
         str1 = conn_param1
@@ -263,7 +163,7 @@ def plot_combined_flow_signals(df, entities, time_window=10, time_scale='min', d
     vec_conn2_ent1 = (vec_conn2_ent1 - all_min) / scale
     vec_conn2_ent2 = (vec_conn2_ent2 - all_min) / scale
     # Map to [-4.5, -2.5]
-    vec_conn2_ent1 = vec_conn2_ent1 * 2 - 4.5
+    vec_conn2_ent1 = vec_conn2_ent1 * 2 - 4.5 # 4.5
     vec_conn2_ent2 = vec_conn2_ent2 * 2 - 4.5
 
     # Plot
@@ -296,6 +196,7 @@ def plot_combined_flow_signals(df, entities, time_window=10, time_scale='min', d
     ax.annotate(str2, xy=(x_low - x_scale * 0.13, -5), annotation_clip=False, fontsize=12, rotation=90,
                 style='italic')
 
+    # Plot separating line
     x_start, x_end = times[0] - pd.DateOffset(hours=0.7), times[-1] + pd.DateOffset(hours=0.6)
     plt.xlim(ax.get_xlim())
     plt.ylim(ax.get_ylim())
@@ -307,6 +208,136 @@ def plot_combined_flow_signals(df, entities, time_window=10, time_scale='min', d
                        Line2D([0], [0], color='C1', label='Entity 2')]
     ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 0.6))
     plt.tight_layout()
+
+
+def plot_combined_flow_signals(df, entities, time_window=10, time_scale='min', date_col=' Timestamp',
+                               conn_params=None, conn_strings=None, figsize=(9, 6)):
+    """Plots the figures depicting flows and two signals formed from them"""
+    if conn_params is None:
+        conn_params = []
+    if conn_strings is None:
+        conn_strings = conn_params
+
+    idx = df[' Source IP'].isin(entities) | df[' Destination IP'].isin(entities)
+    t_df = df.loc[idx, :]
+    idx0 = t_df[' Source IP'].isin([entities[0]]) | t_df[' Destination IP'].isin([entities[0]])
+    idx_common = (t_df[' Source IP'].isin([entities[0]]) & t_df[' Destination IP'].isin([entities[1]])) | (
+            t_df[' Source IP'].isin([entities[1]]) & t_df[' Destination IP'].isin([entities[0]]))
+    cpy_df = t_df.loc[idx_common, :]
+    t_df = t_df.assign(Entity=idx0.apply(lambda x: 'Entity 1' if x is True else 'Entity 2'))
+    cpy_df = cpy_df.assign(Entity='Entity 2')
+    t_df = pd.concat((t_df, cpy_df), ignore_index=True)
+    t_df = t_df.sort_values(by=[date_col])
+
+    times = []
+    t_df = t_df.sort_values(by=[date_col])
+    current_datetime = t_df.iloc[0][date_col]
+    last_datetime = t_df.iloc[-1][date_col]
+    while current_datetime <= last_datetime:
+        window, current_datetime = get_window(current_datetime, t_df, time_window=time_window, time_scale=time_scale)
+        times.append(current_datetime - datetime.timedelta(minutes=time_window / 2))
+
+    # Plotting flows yaxis in [0, 1] # [3, 4]
+    event_data = [t_df[t_df['Entity'] == 'Entity 1'].loc[:, date_col],
+                  t_df[t_df['Entity'] == 'Entity 2'].loc[:, date_col]]
+    colors = [f'C{i}' for i in range(2)]
+    fig = plt.figure(figsize=figsize)
+    fig.suptitle('Flows by Endpoints', fontsize=18, weight='bold')
+    ax = plt.gca()
+    ax.eventplot(event_data, colors=colors, lineoffsets=[0, 1], linelengths=0.25)
+
+    # Plot separating Lines
+    x_start, x_end = times[0] - pd.DateOffset(hours=0.7), times[-1] + pd.DateOffset(hours=0.6)
+
+    y_ticks_locs = np.empty((0,))
+    y_ticks_lbls = np.empty((0,))
+    signal_lower_bound = 0
+    signal_size = 2
+    for i, conn_param in enumerate(conn_params):
+
+        # Connection Parameter 1 (Activation)
+        cu = ConnectivityUnit()
+        cu.read_flows(t_df, conn_param=conn_param, entity_names=list(entities), sync_window_size=time_window,
+                      time_scale=time_scale)
+        vec_conn_ent1 = cu.samples[:, 0]
+        vec_conn_ent2 = cu.samples[:, 1]
+        if conn_param == 'Activation':
+            vec_conn_ent2 -= 0.05  # Shift overlapping curves
+
+        # Compute location on plot
+        signal_upper_bound = -1.5 - 3*i
+        signal_lower_bound = signal_upper_bound - signal_size
+
+        # Connection Parameter 1 (Activation) yaxis in [-1, 1]
+        if conn_param == 'Activation':
+            # Map to [low, high]
+            vec_conn_ent1 = vec_conn_ent1 * signal_size + signal_lower_bound
+            vec_conn_ent2 = vec_conn_ent2 * signal_size + signal_lower_bound
+
+            # Plot
+            ax.plot(times, vec_conn_ent1, label='Entity 1', color='C0')
+            ax.plot(times, vec_conn_ent2, label='Entity 2', color='C1')
+            y_ticks_loc = np.array([signal_lower_bound, signal_upper_bound], dtype=float)
+            y_ticks_lbl = np.array([0, 1], dtype=int)
+
+        # Connection Parameter 2
+        else:
+            all_signal = np.concatenate((vec_conn_ent1, vec_conn_ent2))
+            scale_signal = np.max(all_signal) - np.min(all_signal)
+            all_min = np.min(all_signal)
+            # Map to [0, 1]
+            vec_conn_ent1 = (vec_conn_ent1 - all_min) / scale_signal
+            vec_conn_ent2 = (vec_conn_ent2 - all_min) / scale_signal
+            # Map to [low, high]
+            vec_conn_ent1 = vec_conn_ent1 * signal_size + signal_lower_bound
+            vec_conn_ent2 = vec_conn_ent2 * signal_size + signal_lower_bound
+
+            # Plot
+            ax.plot(times, vec_conn_ent1, label='Entity 1', color='C0')
+            ax.plot(times, vec_conn_ent2, label='Entity 2', color='C1')
+            y_ticks_loc = np.array([0, signal_size/2, signal_size]) + signal_lower_bound
+            y_ticks_lbl = np.linspace(all_min, all_min + scale_signal, 3)
+            shift = np.mod(scale_signal / 2, 100)
+            y_ticks_lbl -= np.linspace(0, 2 * shift, 3)
+            y_ticks_lbl = y_ticks_lbl.astype(int)
+        y_ticks_locs = np.concatenate((y_ticks_locs, y_ticks_loc))
+        y_ticks_lbls = np.concatenate((y_ticks_lbls, y_ticks_lbl))
+
+        # Plot separating lines
+        plt.plot([x_start, x_end], [signal_upper_bound + signal_size/4, signal_upper_bound + signal_size/4], 'k',
+                 linewidth=0.6, clip_on=False)
+
+    # Adjustments
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.get_yaxis().set_ticks(ticks=y_ticks_locs, labels=y_ticks_lbls)
+    #ax.get_yaxis().set_tick_params(pad=-20)
+    ax.set_ylabel('')
+    ax.set_xlabel('Timestamps $\it{(mm/dd/hh)}$')
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position('top')
+    add_time_window_shades(ax, times, time_window, time_scale)
+
+    # Annotations
+    x_low, x_high = ax.get_xlim()
+    x_scale = x_high - x_low
+    ax.annotate('Flows', xy=(x_low - x_scale * 0.02, 0.3), annotation_clip=False, fontsize=12, rotation=90,
+                style='italic')
+
+    for i, conn_param in enumerate(conn_params):
+        str_conn = conn_strings[i]
+        signal_upper_bound = -1.5 - 3 * i
+        signal_lower_bound = signal_upper_bound - signal_size
+        ax.annotate(str_conn, xy=(x_low - x_scale * 0.21, signal_lower_bound), annotation_clip=False, fontsize=12,
+                    rotation=90, style='italic')  # 0.13
+
+    # Legend
+    legend_elements = [Line2D([0], [0], color='C0', label='Endpoint 1'),
+                       Line2D([0], [0], color='C1', label='Endpoint 2')]
+    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 0.6)) # 1.15
+    plt.tight_layout()
+    return ax
 
 
 # Risk Estimates Over Time Plotting Functions
