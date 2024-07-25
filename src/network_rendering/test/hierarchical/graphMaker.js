@@ -16,12 +16,14 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
     const nodeColors = new Float32Array( nEntities * 4 );
     const degrees = Array(nEntities);
     
+    // Create Cluster Centers
     for ( let j = 0; j < extras.n_cluster; j++){
         entityClustersGroup.add( new THREE.Group());
         nMembers.push(0);
         clusCenters.push( new THREE.Vector3(0, 0, 0));
     }
 
+    // Calculate nodeColors
     for ( let i = 0, clr, t, entityName; i < nEntities; i++ ) {
         entityName = namesArr[i];
 
@@ -36,9 +38,9 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
         nodeColors[ i * 4 + 3] = colorWithRisks ? 1 : entityColors[entityName][3];
 
     }
-    const minDeg = Math.min(...degrees);
-    const maxDeg = Math.max(...degrees);
-    const nodeSizes = Array(nEntities);
+    //const minDeg = Math.min(...degrees);
+    //const maxDeg = Math.max(...degrees);
+    //const nodeSizes = Array(nEntities);
     
     // Compute Cluster Centers & nMembers
     for ( let i = 0, entityName; i < nEntities; i ++ ) {
@@ -56,7 +58,7 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
     for ( let i = 0, entityName, sizeScale, entitySampleMaterial, entity; i < nEntities; i ++ ){
 
         entityName = namesArr[i];       
-        sizeScale = 1 + sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);
+        sizeScale = 1 //+ sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);
         entitySampleMaterial = new THREE.MeshPhongMaterial({
             color:'#000000',
             emissive:'#000000',
@@ -66,7 +68,7 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
         });
 
         entity = new THREE.Mesh( entityGeometry, entitySampleMaterial );
-        entity.scale.set(sizeScale, sizeScale, sizeScale);
+        //entity.scale.set(sizeScale, sizeScale, sizeScale);
         if (i % 3 == 0){
             entity.geometry = routerGeometry;
         }

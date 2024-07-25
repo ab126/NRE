@@ -10,13 +10,15 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
 import vertexShader from '/shaders/vertex.glsl.js'
 import fragmentShader from '/shaders/fragment.glsl.js'
+import vertexShaderDefault from '/shaders/vertex_default.glsl.js'
+import fragmentShaderDefault from '/shaders/fragment_default.glsl.js'
 
 import {generateLegend, fontManager} from '/test/legend/legendMaker.js';
 import {makeNodes, makeConnectivityEdges, makeTopologyEdges, setNodePos, setAllEdgePosFromNodePos, setEdgePosFromNodePos,
     computeClusterParams, colormapLinear, color1, color2} from '/test/hierarchical/graphMaker.js';
 
 import {calcMove} from '/test/force/force-directed.js'
-import * as data from '/saves/net_data_medium1.json' assert {type: 'json'}; // medium1
+import * as data from '/saves/net_data_medium0.json' assert {type: 'json'}; // medium1
 
 console.log(data);
 
@@ -55,15 +57,22 @@ const connectivityMaterial = new THREE.LineBasicMaterial({
     color: '#ff2929'
 });
 
-const topologyMaterial = new THREE.LineBasicMaterial({
-    color: '#fbff29'
+let topologyMaterial = new THREE.LineBasicMaterial({
+    color: '#fbff29',
+    linewidth: 0.5
+});
+
+topologyMaterial = new THREE.ShaderMaterial({
+    vertexShader: vertexShaderDefault,
+    fragmentShader: fragmentShaderDefault,
+    transparent: true,
 });
 
 
 // GUI
 const effectController = {
-    showConnectivity: true,
-    showTopology: false,
+    showConnectivity: false,
+    showTopology: true,
     colorWithRisks: true,
     maxIter: 1950,
     stepSize: .015,
@@ -225,7 +234,7 @@ function initGUI(){
 
     basic.add( effectController, 'activateForce' );
 
-    //basic.close();
+    basic.close();
 
     const loadData = gui.addFolder('Load Data');
 
@@ -343,6 +352,7 @@ function init(){
     [clusterGroup, entityIndexInClus] = makeNodes(entityGeometry, routerGeometry, namesArr,  nodePosArr, funcEdges, riskArr, entityColors,
         clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( clusterGroup );
+    //console.log( entityIndexInClus)
 
     // Edges
 
@@ -481,7 +491,7 @@ function labelMaxRisk(riskArr, maxLabelEntity, clusterGroup){
         oldEntity.remove(oldEntity.children[0]);
         
         // Add the text
-        let size = 0.05;
+        let size = 0.1; // 0.05
         const fm = new fontManager(fontPath);
         const liteMat = new THREE.MeshBasicMaterial( {
             color: 0xffffff,

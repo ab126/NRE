@@ -23,12 +23,29 @@ def start_web_socket_server():
     return ws
 
 
-# Sets up the server and starts streaming data
 def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=False, src_id_col=' Source IP',
                  dst_id_col=' Destination IP', graph_conn_size=150, conn_size=3, t_graph=4, t_sync=0.5,
-                 forget_factor=0.5, relief_factor=0.7):
+                 forget_factor=0.5, relief_factor=0.7, display_time=3):
+    """
+    Sets up the server and starts streaming data
+
+    :param ws: Web Socket Server
+    :param df_conn: Connection data dataframe
+    :param entity_names: Target Set of Entities
+    :param window_type:
+    :param grow_entities:
+    :param src_id_col:
+    :param dst_id_col:
+    :param graph_conn_size:
+    :param conn_size:
+    :param t_graph:
+    :param t_sync:
+    :param forget_factor:
+    :param relief_factor:
+    :param display_time: Amount of time the graph is displayed on the rendering end
+    :return:
+    """
     n_entities = len(entity_names)
-    display_time = 2  # Amount of time the graph is displayed on the rendering end
 
     for _ in range(1000):  # For x runs
 
@@ -53,14 +70,15 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 
         print("Client Connected")
 
+        edges_list = []
         ind = 0
         n_flows = 0
         n_new = 0
         while end_of_df is False:
 
             if start_of_df and not grow_entities:  # Initial Run
-                edges_list = []
                 start_of_df = False
+                continue
             else:
                 if window_type == 'time':
                     temp_df, current_datetime = get_window(current_datetime, df_conn, date_col=date_col,
@@ -103,7 +121,6 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
                                           'riskArr': nm.mat_x.tolist(), 'riskCov': nm.mat_p.tolist(),
                                           'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
                                           'topologyEdges': edges_list, 'newEntities': n_new})
-                print(json_string)
             else:
                 json_string = json.dumps({'names': nm.entity_names, 'funcEdges': nm.mat_f.tolist(),
                                           'riskArr': nm.mat_x.tolist(), 'riskCov': nm.mat_p.tolist(),
