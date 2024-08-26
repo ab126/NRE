@@ -20,7 +20,7 @@ def polar2cartesian(r, theta, units='deg'):
 
 
 def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, dy=1, n_points=1000, plot=True, y_max=3,
-                        show_names=True, label_size=8, paths_highlight=None):
+                        show_names=True, label_size=8, paths_highlight=None, discrete_color=False):
     """
     Depicts the network according to the calculated distances to route from source to every other entity. Fits the
     entities to integer cartesian coordinates where the source is left most and every other entity is distributed according
@@ -39,6 +39,7 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
     :param show_names: If True, shows the names of entities as well.
     :param label_size: Fontsize for labels.
     :param paths_highlight: List of paths, that are list of node tuples, to highlight.
+    :param discrete_color: If True, colors the entities uniformly separated for better visual
     :return fig: Figure of the network plot
     """
     source = list(distances.keys())[0]
@@ -87,6 +88,11 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
     # Plot the rest
     cmap = plt.cm.YlOrRd  # plt.cm.Reds
     node_clr = [risks[node] for node in g.nodes]
+    if discrete_color:
+        lin_color = np.linspace(min(node_clr), max(node_clr), len(node_clr))
+        nodes = list(g.nodes)
+        risks = {nodes[ind]: lin_color[i] for i, ind in enumerate(np.argsort(node_clr))}
+
     norm = matplotlib.colors.Normalize(vmin=min(node_clr), vmax=max(node_clr))
 
     # Draw most nodes
@@ -131,7 +137,7 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
 
     # Set x ticks
     ax.spines['top'].set_visible(True)
-    ax.set_xlabel('Increasing Risk Levels')
+    ax.set_xlabel('Increasing Path Risk From the Source')
     ax.get_xaxis().set_ticks(ticks=x_layers)
 
     if plot:

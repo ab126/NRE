@@ -78,6 +78,7 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 
             if start_of_df and not grow_entities:  # Initial Run
                 start_of_df = False
+                time.sleep(display_time/2)
                 continue
             else:
                 if window_type == 'time':
@@ -102,10 +103,10 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
                     n_new = len([name for name in curr_entities if name not in nm.entity_names])
                     nm.add_entities(curr_entities)
                 # try:
-                nm.update_new_tick(temp_df, conn_param='NPR', sync_window_size=t_sync,
-                                   window_type=window_type, conn_size=conn_size, keep_unit=True,
-                                   forget_factor=forget_factor,
-                                   relief_factor=relief_factor)
+                nm.update_new_tick_conn_data(temp_df, conn_param='NPR', sync_window_size=t_sync,
+                                             window_type=window_type, conn_size=conn_size, keep_unit=True,
+                                             forget_factor=forget_factor,
+                                             relief_factor=relief_factor)
                 # except AssertionError:
                 # print(AssertionError)
                 # break
