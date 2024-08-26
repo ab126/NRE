@@ -17,9 +17,9 @@ print('File to df time (s): ', end - start, '\n')
 
 start = time.time()
 nm = NetworkModel(entity_names=list(np.arange(5)), mat_x_init= np.ones(5), mat_p_init=np.eye(5))
-nm.update_new_tick(df, src_id_col=' Source ID', dst_id_col=' Destination ID',
-                   src_feature_col=' Source Flow Attribute', dst_feature_col=' Destination Flow Attribute',
-                   sync_window_size=20, time_scale='sec', keep_unit=True)
+nm.update_new_tick_conn_data(df, src_id_col=' Source ID', dst_id_col=' Destination ID',
+                             src_feature_col=' Source Flow Attribute', dst_feature_col=' Destination Flow Attribute',
+                             sync_window_size=20, time_scale='sec', keep_unit=True)
 end = time.time()
 print('\nDf to risk estimates (s): ', end - start)
 mat_x, mat_p = nm.mat_x, nm.mat_p

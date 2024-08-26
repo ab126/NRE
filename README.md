@@ -61,10 +61,11 @@ nm = NetworkModel(entity_names=list(np.arange(5)), mat_x_init= np.ones(5), mat_p
 ```
 Then, the canonical connection data is fed through the model to estimate the risks at the new time tick. See [ConnectivityUnit.read_flows](https://github.com/ab126/NRE/blob/main/src/network_connectivity.py)
 for all the hyperparameters.
+
 ```python
-nm.update_new_tick(df, src_id_col=' Source ID', dst_id_col=' Destination ID',
-                   src_feature_col=' Source Flow Attribute', dst_feature_col=' Destination Flow Attribute',
-                   sync_window_size=20, time_scale='sec', keep_unit=True)
+nm.update_new_tick_conn_data(df, src_id_col=' Source ID', dst_id_col=' Destination ID',
+                             src_feature_col=' Source Flow Attribute', dst_feature_col=' Destination Flow Attribute',
+                             sync_window_size=20, time_scale='sec', keep_unit=True)
 mat_x, mat_p = nm.mat_x, nm.mat_p
 ```
 

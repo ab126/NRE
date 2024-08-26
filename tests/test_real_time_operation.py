@@ -34,7 +34,7 @@ while end_of_df is False:
     date_times.append(current_datetime)
     if current_datetime >= last_datetime:
         end_of_df = True
-    nm.update_new_tick(temp_df)
+    nm.update_new_tick_conn_data(temp_df)
     mat_x, mat_p = nm.mat_x, nm.mat_p
 
     plt.clf()
