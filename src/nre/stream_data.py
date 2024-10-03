@@ -7,11 +7,11 @@ import time
 import logging
 from websocket_server import WebsocketServer
 
-from src.network_connectivity import get_all_entities
-from src.preprocess import preprocess_df
-from src.real_time_model import NetworkModel
-from src.safe_routing import communication_graph_from_df
-from src.time_windowed import get_window
+from .network_connectivity import get_all_entities
+from .preprocess import preprocess_df
+from .real_time_model import NetworkModel
+from .safe_routing import communication_graph_from_df
+from .time_windowed import get_window
 
 
 # Start Server
@@ -139,13 +139,14 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 
 if __name__ == '__main__':
     # Read Data
-    df_raw = pd.read_csv('../CIC-IDS-2017/GeneratedLabelledFlows/TrafficLabelling/Tuesday-WorkingHours.pcap_ISCX.csv',
-                         header=0, encoding='cp1252')
+    df_raw = pd.read_csv(
+        '../../CIC-IDS-2017/GeneratedLabelledFlows/TrafficLabelling/Tuesday-WorkingHours.pcap_ISCX.csv',
+        header=0, encoding='cp1252')
     df = preprocess_df(df_raw, date_col=' Timestamp')
 
     df_temp = df.iloc[:10000, :]
 
-    with open(r'../tests/saves/victim_net.pickle', 'rb') as handle:
+    with open(r'../../tests/saves/victim_net.pickle', 'rb') as handle:
         names = pickle.load(handle)
 
     server = start_web_socket_server()

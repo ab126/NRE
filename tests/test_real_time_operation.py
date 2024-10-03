@@ -3,10 +3,10 @@ import pickle
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from src.kalman_network_tools import plot_kalman_res
-from src.preprocess import preprocess_df
-from src.real_time_model import NetworkModel
-from src.time_windowed import get_window
+from ..src.nre.kalman_network_tools import plot_kalman_res
+from ..src.nre.preprocess import preprocess_df
+from ..src.nre.real_time_model import NetworkModel
+from ..src.nre.time_windowed import get_window
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Monday-WorkingHours.pcap_ISCX.csv'
 df_cic = pd.read_csv(file_addr, header=0, encoding='cp1252')

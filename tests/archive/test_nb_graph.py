@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 
-from src.archive.causal_utils import generate_random_dag, add_linear_model, generate_samples
+from src import generate_random_dag, add_linear_model, generate_samples
 
 
 def generate_random_causal_linear_model_samples(n_node=5, n_sample=100, p_er_coef=0.75):

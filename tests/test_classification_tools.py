@@ -3,9 +3,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 
-from src.analyze_cic_ids import infer_roc
-from src.classification_tools import _check_uniformity, _non_median_supress_indices, _find_intersects_numerically, \
-    max_ba_operating_point, plot_roc_curves
+from ..src.nre.classification_tools import _check_uniformity, _non_median_supress_indices, _find_intersects_numerically, \
+    max_ba_operating_point, plot_roc_curves, infer_roc
 
 
 class TestMaxBAOperatingPoint(unittest.TestCase):

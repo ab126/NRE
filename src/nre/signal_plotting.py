@@ -7,8 +7,8 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 
-from src.network_connectivity import ConnectivityUnit
-from src.time_windowed import get_window
+from .network_connectivity import ConnectivityUnit
+from .time_windowed import get_window
 
 
 # Preprocessing Plotting Functions

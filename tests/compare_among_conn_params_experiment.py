@@ -3,15 +3,8 @@ import pickle
 
 from matplotlib import pyplot as plt
 
-from src.network_connectivity import cic_conn_param_specs
-from src.preprocess import preprocess_df
-from src.analyze_cic_ids import compare_among_conn_params, plot_perf_comparison, nre_classification, \
-    flow_based_classification
-
-from sklearn.svm import LinearSVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB
+from ..src.nre.preprocess import preprocess_df
+from ..src.nre.analyze_cic_ids import compare_among_conn_params, plot_perf_comparison
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Tuesday-WorkingHours.pcap_ISCX.csv'  # 'Monday-WorkingHours.pcap_ISCX.csv' #  Wednesday-workingHours.pcap_ISCX.csv
 df_cic = pd.read_csv(file_addr, header=0)

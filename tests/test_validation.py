@@ -1,20 +1,10 @@
 import pandas as pd
 import pickle
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
 
-from src.preprocess import preprocess_df
-from src.network_connectivity import ConnectivityUnit
-from src.analyze_cic_ids import nre_classification, flow_based_classification
-from src.classification_tools import plot_roc_curves
+from ..src.nre.preprocess import preprocess_df
+from ..src.nre.analyze_cic_ids import nre_classification, flow_based_classification
 
-from sklearn.svm import LinearSVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB
-
-from src.validation_tools import validate_model
+from ..src.nre.validation_tools import validate_model
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Tuesday-WorkingHours.pcap_ISCX.csv'
 df_cic = pd.read_csv(file_addr, header=0, encoding='cp1252')

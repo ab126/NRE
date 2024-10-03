@@ -4,7 +4,7 @@ import datetime
 #from .custom_graph import *
 import numpy as np
 
-from src.custom_graph import get_Graph, get_data
+from src import get_Graph, get_data
 
 
 # TODO: Probably lot of abundance here. fix Imports as well

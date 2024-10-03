@@ -1,7 +1,7 @@
 import numpy as np
 
-from src.preprocess import preprocess_df
-from src.network_connectivity import ConnectivityUnit, single_risk_update
+from .preprocess import preprocess_df
+from .network_connectivity import ConnectivityUnit, single_risk_update
 
 
 # TODO: This class should deal with the whole network. Add detailed docs (?)

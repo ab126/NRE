@@ -92,7 +92,7 @@ def apply_spec_clus(mat_f, node_names, n_clus, plot_bool=True, fontsize=24, seed
         plt.rcParams.update({'font.size': fontsize})
         # Rendering Clusters
         plt.figure(figsize=(10, 10))
-        plt.imshow(nx.adjacency_matrix(g_relabeled).todense(), interpolation='nearest')
+        plt.imshow(nx.adjacency_matrix(g_relabeled).todense(), interpolation='nearest') # cmap='Blues'
         plt.colorbar()
         cm_strs = ['Reds', 'Reds']
         for i, cluster in enumerate(all_clusters):

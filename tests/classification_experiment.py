@@ -3,9 +3,9 @@ import pickle
 
 from matplotlib import pyplot as plt
 
-from src.preprocess import preprocess_df
-from src.analyze_cic_ids import nre_classification, flow_based_classification
-from src.classification_tools import max_ba_operating_point, get_ba_from_operating_point, plot_roc_curves
+from ..src.nre.preprocess import preprocess_df
+from ..src.nre.analyze_cic_ids import nre_classification, flow_based_classification
+from ..src.nre.classification_tools import plot_roc_curves
 
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier

@@ -47,9 +47,9 @@ import time
 
 from matplotlib import pyplot as plt
 
-from src.kalman_network_tools import plot_kalman_res
-from src.preprocess import preprocess_df
-from src.real_time_model import NetworkModel
+from src import plot_kalman_res
+from src import preprocess_df
+from src import NetworkModel
 
 df_raw = pd.read_csv('..\\test_flows.csv', header=0, encoding='cp1252')
 df = preprocess_df(df_raw, date_col=' Timestamp')

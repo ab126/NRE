@@ -1,21 +1,20 @@
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import copy
 import numpy.random as nr
 
 from matplotlib import pyplot as plt
 
-from src.analyze_cic_ids import nre_classification
+from ..src.nre.analyze_cic_ids import nre_classification
 
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 
-from src.classification_tools import plot_roc_curves
-from src.network_connectivity import get_mat_f_q_from_covariance
-from src.preprocess import preprocess_df
+from ..src.nre.classification_tools import plot_roc_curves
+from ..src.nre.network_connectivity import get_mat_f_q_from_covariance
+from ..src.nre.preprocess import preprocess_df
 from test_network_model_graph import generate_random_mvn_model, samples2flows
 
 
