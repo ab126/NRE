@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		
+		<title>three.js webgl - raw shader</title>		
+		<meta charset="utf-8">		
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	
+
+	<body>
+		<script id="vertexShader" type="x-shader/x-vertex">
+
+			precision mediump float;
+			precision mediump int;
+
+			attribute vec4 color;
+
+			varying vec3 vPosition;
+			varying vec4 vColor;
+
+			void main()	{
+
+				vPosition = position;
+				vColor = color;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+
+		<script id="fragmentShader" type="x-shader/x-fragment">
+
+			precision mediump float;
+			precision mediump int;
+
+			uniform float time;
+
+			varying vec3 vPosition;
+			varying vec4 vColor;
+
+			void main()	{
+
+				vec4 color = vec4( vColor );
+				color.g = sin( vPosition.x * 10.0 + time ) ;
+
+				gl_FragColor = color;
+
+			}
+
+		</script>		
+		
+		<script type="x-shader/x-vertex" id="vertexshader">
+
+			uniform float amplitude;
+
+			attribute vec3 displacement;
+			attribute vec3 customColor;
+
+			varying vec3 vColor;
+
+			void main() {
+
+				vec3 newPosition = position + amplitude * displacement;
+
+				vColor = customColor;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( newPosition, 1.0 );
+
+			}
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+			uniform vec3 color;
+			uniform float opacity;
+
+			varying vec3 vColor;
+
+			void main() {
+
+				gl_FragColor = vec4( vColor * color, opacity );
+
+			}
+
+		</script>
+
+		<div id="container"></div>
+
+		<script type="module" src="/nodeTest.js"></script>
+		
+		</script>
+
+	</body>
+</html>
