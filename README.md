@@ -29,8 +29,8 @@ pip install -r requirements.txt
 `.
 
 For beyond correlative entity relationship modelling, it
-also requires [npeet](https://github.com/gregversteeg/NPEET) 
-package which is placed under [src](https://github.com/ab126/NRE/tree/main/src).
+also requires [npeet](https://github.com/gregversteeg/NPEET) [2]
+package whose modified version is placed under [src.nre](https://github.com/ab126/NRE/tree/main/src/nre).
 
 
 ### Working Example
@@ -47,9 +47,9 @@ import time
 
 from matplotlib import pyplot as plt
 
-from src import plot_kalman_res
-from src import preprocess_df
-from src import NetworkModel
+from src.nre import plot_kalman_res
+from src.nre import preprocess_df
+from src.nre import NetworkModel
 
 df_raw = pd.read_csv('..\\test_flows.csv', header=0, encoding='cp1252')
 df = preprocess_df(df_raw, date_col=' Timestamp')
@@ -71,3 +71,4 @@ mat_x, mat_p = nm.mat_x, nm.mat_p
 
 # References
 1. Arash Habibi Lashkari, Gerard Draper-Gil, Mohammad Saiful Islam Mamun and Ali A. Ghorbani, "Characterization of Tor Traffic Using Time Based Features", In the proceeding of the 3rd International Conference on Information System Security and Privacy, SCITEPRESS, Porto, Portugal, 2017
+2. Gregversteeg/NPEET: Non-parametric entropy estimation toolbox, GitHub. Available at: https://github.com/gregversteeg/NPEET (Accessed: 10 October 2024). 
