@@ -34,7 +34,7 @@ package whose modified version is placed under [src.nre](https://github.com/ab12
 
 
 ### Working Example
-This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/tests/test_working_example.py).
+This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/test_working_example.py).
 
 First, the connection data is read from a source
 such as ".txt" file, and it is transformed to the desired format. For convenience, [CICFlowMeter](https://www.unb.ca/cic/research/applications.html#CICFlowMeter) [1]
