@@ -13,8 +13,6 @@ from ordered_set import OrderedSet
 from .preprocess import preprocess_df
 from .time_windowed import get_window
 import scipy.fft
-from pomegranate.bayesian_network import BayesianNetwork
-from src.archive.bbn_functions import get_DAG_from_model
 
 MIN_SAMPLES = 5  # Minimum number of samples required for connectivity graph calculation
 
@@ -253,37 +251,7 @@ class ConnectivityUnit:
         assert self.samples.shape[0] >= MIN_SAMPLES, "Number of Samples ({}) must be at least {}!".format(
             self.samples.shape[0], MIN_SAMPLES)
 
-        if method == 'bbn':
-            # Bayesian network from samples
-            learnt_model = BayesianNetwork.from_samples(self.samples, state_names=self.names)
-            g_learnt = get_DAG_from_model(learnt_model)
-            # nx.draw(G_learnt, with_labels=True, font_weight='bold')
-
-            sample_cov = nx.adjacency_matrix(g_learnt, self.names)
-            sample_cov = sample_cov.todense()
-            self.mat_f = sample_cov
-
-        elif method == 'nb_old':
-            mat_f = np.zeros((len(self.names), len(self.names)))
-
-            for i, node1 in enumerate(self.names):
-                for j, node2 in enumerate(self.names):
-                    if j < i:
-                        continue
-                    elif i == j:
-                        mat_f[i, j] = 1
-                        continue
-                    data1 = [[el] for el in self.samples[:, i]]
-                    data2 = [[el] for el in self.samples[:, j]]
-
-                    mi1_2 = ee.mi_old(data1, data2)
-                    loss = - self.mi_mapping(mi1_2)
-                    if loss < self.loss_thr:
-                        mat_f[i, j] = -loss
-                        mat_f[j, i] = -loss
-            self.mat_f = mat_f
-
-        elif method == 'mi':
+        if method == 'mi':
             mat_f = np.zeros((len(self.names), len(self.names)))
 
             for i, node1 in enumerate(self.names):

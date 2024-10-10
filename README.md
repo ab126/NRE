@@ -29,12 +29,12 @@ pip install -r requirements.txt
 `.
 
 For beyond correlative entity relationship modelling, it
-also requires [npeet](https://github.com/gregversteeg/NPEET) 
-package which is placed under [src](https://github.com/ab126/NRE/tree/main/src).
+also requires [npeet](https://github.com/gregversteeg/NPEET) [2]
+package whose modified version is placed under [src.nre](https://github.com/ab126/NRE/tree/main/src/nre).
 
 
 ### Working Example
-This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/test_working_example.py).
+This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/tests/test_working_example.py).
 
 First, the connection data is read from a source
 such as ".txt" file, and it is transformed to the desired format. For convenience, [CICFlowMeter](https://www.unb.ca/cic/research/applications.html#CICFlowMeter) [1]
@@ -71,3 +71,4 @@ mat_x, mat_p = nm.mat_x, nm.mat_p
 
 # References
 1. Arash Habibi Lashkari, Gerard Draper-Gil, Mohammad Saiful Islam Mamun and Ali A. Ghorbani, "Characterization of Tor Traffic Using Time Based Features", In the proceeding of the 3rd International Conference on Information System Security and Privacy, SCITEPRESS, Porto, Portugal, 2017
+2. Gregversteeg/NPEET: Non-parametric entropy estimation toolbox, GitHub. Available at: https://github.com/gregversteeg/NPEET (Accessed: 10 October 2024). 
