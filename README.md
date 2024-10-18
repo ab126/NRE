@@ -22,6 +22,7 @@ NRE has been tested with Python 3.10 and it requires:
 10. seaborn
 11. networkx
 12. pillow
+13. pingouin
 
 These dependencies can be installed via
 `

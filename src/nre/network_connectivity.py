@@ -4,6 +4,8 @@ import matplotlib
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import pingouin as pg
 from filterpy.kalman import KalmanFilter
 
 from .network_partitioning import apply_spec_clus
@@ -26,7 +28,7 @@ cic_conn_param_specs = {
                       'dst_feature_col': ' Bwd Header Length'},
     'Idle Time': {'method': 'average', 'src_feature_col': 'Idle Mean', 'dst_feature_col': 'Idle Mean'},
     'NAP': {'method': 'total', 'src_feature_col': ' act_data_pkt_fwd',
-                           'dst_feature_col': ' act_data_pkt_fwd'},
+            'dst_feature_col': ' act_data_pkt_fwd'},
     'NPS': {'method': 'total', 'src_feature_col': ' Total Fwd Packets',
             'dst_feature_col': ' Total Backward Packets'},  # Number of Packets Sent
     'NPR': {'method': 'total', 'src_feature_col': ' Total Backward Packets',
@@ -58,7 +60,9 @@ class ConnectivityUnit:
                             'Num Active Packets', 'Active Time', 'Idle Time']
         self.conn_param_specs = cic_conn_param_specs
         self.samples = np.empty((0, 2))
+        self.control_samples = np.empty((0, 2))
         self.names = []
+        self.control_names = []
         self.num_appearances = []  # Number of times entities appear in connection data 
         self.mat_f = np.array([[]])
 
@@ -229,7 +233,8 @@ class ConnectivityUnit:
         """Set the loss threshold for naive bayes graph inference"""
         self.loss_thr = loss_thr  # loss is 0 if X and Y are independent
 
-    def fit_connectivity_model(self, method='cov', infer_mat_r=False, verbose=True, clear_samples=False):
+    def fit_connectivity_model(self, method='cov', infer_mat_r=False, verbose=True, clear_samples=False,
+                               control_dict=None):
         """
         Fits the Graph model mat_f and the noise matrix mat_r using the method given
         ---------------------------------
@@ -241,11 +246,13 @@ class ConnectivityUnit:
                 'mi_gauss' : Mutual Information Method with gaussian/normal assumption on samples
                 'di' : Directed Information Method where every edge weight is the DI between respective samples of
                     entities, with given memory length
+                'pcov' : Partial Covariances with control_dict as control set. control_dict must be provided
                 'cov' : (default) Correlation Coefficient Method where every edge weight is the Corr. Coeff. between
                     respective samples of entities
         :param infer_mat_r: If True, infers the measurement noise covariance matrix from samples
         :param verbose: If True, prints graph matrix, mat_f, stability measures
         :param clear_samples: If True clears the samples to recover memory
+        :param control_dict: Dictionary of entity name:time_series that are used as conditioning set
         :return : None
         """
 
@@ -316,6 +323,32 @@ class ConnectivityUnit:
                     loss = - self.mi_mapping(2 * di1_2)
                     if loss < self.loss_thr:
                         mat_f[i, j] = -loss
+            self.mat_f = mat_f
+
+        elif method == 'pcov':  # Partial Covariance
+            assert control_dict is not None, "No control set samples provided"
+            for cont_name, cont_samples in control_dict.items():
+                assert len(cont_samples) == self.samples.shape[
+                    0], "Number of samples in control set does not match target samples"
+                self.control_names.append(cont_name)
+
+            # Form data df
+            norm_samples = self.samples - np.mean(self.samples, axis=0)
+            norm_samples = norm_samples / np.std(norm_samples, axis=0)
+            data_df = pd.DataFrame(norm_samples, columns=self.names)
+            for cont_name, cont_vals in control_dict.items():
+                norm_control_vals = cont_vals - np.mean(cont_vals, axis=0)
+                norm_control_vals = norm_control_vals / np.std(norm_control_vals, axis=0)
+                data_df[cont_name] = norm_control_vals
+
+            # Compute
+            res_df = pg.pairwise_corr(data_df, method='pearson', covar=self.control_names)
+            mat_f = np.eye(len(self.names))
+            for index, row in res_df.iterrows():
+                i = self.names.index(row['X'])
+                j = self.names.index(row['Y'])
+                mat_f[i, j] = row['r']
+                mat_f[j, i] = row['r']
             self.mat_f = mat_f
 
         else:  # Covariance Method (Assuming gaussian RVs)
