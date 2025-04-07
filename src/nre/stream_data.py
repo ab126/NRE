@@ -1,3 +1,4 @@
+import os
 import pickle
 import json
 import pandas as pd
@@ -7,11 +8,11 @@ import time
 import logging
 from websocket_server import WebsocketServer
 
-from .network_connectivity import get_all_entities
-from .preprocess import preprocess_df
-from .real_time_model import NetworkModel
-from .safe_routing import communication_graph_from_df
-from .time_windowed import get_window
+from src.nre.network_connectivity import get_all_entities
+from src.nre.preprocess import preprocess_df
+from src.nre.real_time_model import NetworkModel
+from src.nre.safe_routing import communication_graph_from_df
+from src.nre.time_windowed import get_window
 
 
 # Start Server
@@ -25,7 +26,7 @@ def start_web_socket_server():
 
 def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=False, src_id_col=' Source IP',
                  dst_id_col=' Destination IP', graph_conn_size=150, conn_size=3, t_graph=4, t_sync=0.5,
-                 forget_factor=0.5, relief_factor=0.7, display_time=3):
+                 forget_factor=0.5, relief_factor=0.7, display_time=3, save_mode=False, save_dir=None):
     """
     Sets up the server and starts streaming data
 
@@ -46,6 +47,11 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
     :return:
     """
     n_entities = len(entity_names)
+    k = 0
+    if save_mode:
+        print(os.getcwd())
+        if save_dir is None:
+            save_dir = "./stream_data"
 
     for _ in range(1000):  # For x runs
 
@@ -128,23 +134,28 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
                                           'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
                                           'topologyEdges': edges_list, 'newEntities': n_new})
 
+
+
             #
             try:
                 ws.send_message(ws.clients[0], json_string)
+                if save_mode:
+
+                    with open("{}/render_data_{:03d}.json".format(save_dir, k), "w") as file:
+                        # The 'indent' parameter is optional, but it makes the JSON file more readable
+                        json.dump(json_string, file)  # , indent=4)
+                        k += 1
             except:
                 break
             # server.send_message_to_all(jsonstring)
             time.sleep(display_time)
 
 
-if __name__ == '__main__':
+def main():
+    """ Start the server and wait for clients"""
     # Read Data
-    df_raw = pd.read_csv(
-        '../../CIC-IDS-2017/GeneratedLabelledFlows/TrafficLabelling/Tuesday-WorkingHours.pcap_ISCX.csv',
-        header=0, encoding='cp1252')
-    df = preprocess_df(df_raw, date_col=' Timestamp')
-
-    df_temp = df.iloc[:10000, :]
+    with open(r'../../tests/saves/stream_data_84.pickle', 'rb') as file:
+        df = pickle.load(file)
 
     with open(r'../../tests/saves/victim_net.pickle', 'rb') as handle:
         names = pickle.load(handle)
@@ -152,13 +163,6 @@ if __name__ == '__main__':
     server = start_web_socket_server()
     start_stream(server, df, names)
 
-    """
-    queue = queue.Queue()
-    j0 = Thread(target=start_server, args=(queue,))
-    j0.start()
 
-    j1 = Thread(target=graph_process, args=(df_temp, entity_names, queue,))
-
-    j0.join()
-    j1.join()
-    """
+if __name__ == '__main__':
+    main()

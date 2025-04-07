@@ -9,6 +9,27 @@ from networkx.drawing.layout import rescale_layout
 from .network_partitioning import apply_spec_clus
 
 
+def draw_spring_layout_with_risks(g, node_clr_arr, seed=345, cmap=None, discrete_color=False, with_labels=False):
+    """ Draws the network g with spring layout and colors the nodes according to their risks"""
+
+    if cmap is None:
+        cmap = plt.cm.YlOrRd
+    if discrete_color:
+        lin_color = np.linspace(min(node_clr_arr), max(node_clr_arr), len(node_clr_arr))
+        nodes = list(g.nodes)
+        node_clr_dict = {nodes[ind]: lin_color[i] for i, ind in enumerate(np.argsort(node_clr_arr))}
+        node_clr_arr = [node_clr_dict[node] for node in g.nodes]
+
+    norm = matplotlib.colors.Normalize(vmin=min(node_clr_arr), vmax=max(node_clr_arr))
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    pos = nx.spring_layout(g, seed=seed)
+    nx.draw(g, pos=pos, with_labels=with_labels, node_color=node_clr_arr, cmap=cmap)
+    cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, pad=0.05, shrink=0.6)
+    cbar.set_label('Entity Risks', labelpad=-55)
+    return fig, ax
+
+
 # Safe Routing Plotting Functions
 def polar2cartesian(r, theta, units='deg'):
     """Return the cartesian coordinates (x, y) corresponding to the polar coordinates"""
@@ -19,32 +40,41 @@ def polar2cartesian(r, theta, units='deg'):
     return r * np.cos(theta), r * np.sin(theta)
 
 
-def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, dy=1, n_points=1000, plot=True, y_max=3,
-                        show_names=True, label_size=8, paths_highlight=None, discrete_color=False):
+def cartesian_dist_plot(g, distances, entity_atts, destination=None, title='', cbar_label=None, x_label=None, plot=True,
+                        cmap=None, y_max=3, show_names=True, label_size=8, paths_highlight=None, discrete_color=False):
     """
     Depicts the network according to the calculated distances to route from source to every other entity. Fits the
-    entities to integer cartesian coordinates where the source is left most and every other entity is distributed according
-    to their distance.
+    entities to integer cartesian coordinates where the source is left-most and every other entity is distributed according
+    to their distance and colors the entities according to their attributes.
 
     :param g: NetworkX graph which stands for the communication graph of the network
     :param distances: Dictionary of distances or risk-levels from the source. The Dictionary is ordered with increasing
         distances
-    :param risks: Dictionary of entity risks
+    :param entity_atts: Dictionary of entity attributes
     :param destination: (optional) Destination node name
     :param title: Title of the plot
-    :param dx: Increment in x direction
-    :param dy: Increment in y direction
+    :param cbar_label: Colorbar Label
+    :param x_label: x axis label
     :param plot: If True, show the plot
-    :param n_points: Number of points to draw vertical lines
+    :param cmap: Pyplot colormap for entity colors
+    :param y_max: Ratio of furthest entity elevation to inter-entitiy distance in y direction.
     :param show_names: If True, shows the names of entities as well.
     :param label_size: Fontsize for labels.
     :param paths_highlight: List of paths, that are list of node tuples, to highlight.
     :param discrete_color: If True, colors the entities uniformly separated for better visual
     :return fig: Figure of the network plot
     """
+    if cmap is None:
+        cmap = plt.cm.YlOrRd  # plt.cm.Reds
+    if cbar_label is None:
+        cbar_label = 'Mean Entity Risks'
+    if x_label is None:
+        x_label = 'Increasing Path Risk From the Source'
+
     source = list(distances.keys())[0]
     vals, indices, counts = np.unique(list(distances.values()), return_inverse=True, return_counts=True)
 
+    dx = 1
     x_cur, y_cur = 0, 0
     idx_prev = -1
     fig, ax = plt.subplots(figsize=(9, 6))
@@ -54,53 +84,50 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
     for i, node in enumerate(distances.keys()):
         idx = indices[i]
         num = counts[indices[i]]  # Number of same distance entities
-        ddy = 1 if num == 1 else y_max * 2 / (num - 1)
+        dy = 1 if num == 1 else y_max * 2 / (num - 1)
 
         # Update coordinates
         if idx != idx_prev:  # New layer
             if num != 1:
-                # y_init = - (num - 1) / 2 * dy
                 y_init = -y_max
             elif i == 0 or i == len(distances) - 1:  # First or last entity
                 y_init = 0
             else:  # Single entity in middle layers
-                # y_init = (-1) ** (i + 1) * dy / 2
                 y_init = (-1) ** (i + 1) * y_max / 2
             x_cur, y_cur = x_cur + dx, y_init
             x_layers.append(x_cur)
         else:
-            # x_cur, y_cur = x_cur, y_cur + dy
-            x_cur, y_cur = x_cur, y_cur + ddy
+            x_cur, y_cur = x_cur, y_cur + dy
         pos[node] = np.array([x_cur, y_cur])
         idx_prev = idx
 
     # Plot lines
-    ys = np.linspace(-(max_num / 2 + 0.5), max_num / 2 + 0.5, n_points) * dy
+    ys = np.linspace(-1.2 * y_max, 1.2 * y_max)
     for x_cur in x_layers:
         xs = np.array([x_cur for _ in ys])
         ax.plot(xs, ys, 'tab:gray', alpha=.2)
 
     # Plot x axis
-    y_x_ax = -(max_num / 2 + 1)
-    ax.plot([x_layers[0], x_layers[-1]], [y_x_ax, y_x_ax], color="k")
-    ax.plot(x_layers[-1], y_x_ax, ls="", marker=">", ms=5, color="k", clip_on=False)
+    y_x_ax = 0
+    # ax.plot([x_layers[0], x_layers[-1]], [y_x_ax, y_x_ax], color="k")
+    # ax.plot(x_layers[-1], y_x_ax, ls="", marker=">", ms=5, color="k", clip_on=False)
 
     # Plot the rest
-    cmap = plt.cm.YlOrRd  # plt.cm.Reds
-    node_clr = [risks[node] for node in g.nodes]
+    node_clr = [entity_atts[node] for node in g.nodes]
     if discrete_color:
         lin_color = np.linspace(min(node_clr), max(node_clr), len(node_clr))
         nodes = list(g.nodes)
-        risks = {nodes[ind]: lin_color[i] for i, ind in enumerate(np.argsort(node_clr))}
+        entity_atts = {nodes[ind]: lin_color[i] for i, ind in enumerate(np.argsort(node_clr))}
 
     norm = matplotlib.colors.Normalize(vmin=min(node_clr), vmax=max(node_clr))
 
     # Draw most nodes
     most_nodes = [node for node in g.nodes if node != source and node != destination]
-    most_clr = [risks[node] for node in most_nodes]
+    most_clr = [entity_atts[node] for node in most_nodes]
     if show_names:
         pos_label = {node: pos[node] + (-.02, -0.5) for node in pos}
-        labels = {node: '' + '.'.join(node.split('.')[-4:]) for node in pos}
+        # labels = {node: '.'.join(node.split('.')[-4:]) for node in pos}
+        labels = {node: node for node in pos}
         nx.draw_networkx_labels(g, pos_label, labels=labels, ax=ax, clip_on=False, font_size=label_size)
     most_nodes = nx.draw_networkx_nodes(g, pos, nodelist=most_nodes, cmap=cmap, node_color=most_clr, ax=ax)
     most_nodes.set_edgecolor('black')
@@ -108,14 +135,14 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
     nx.draw_networkx_edges(g, pos, width=1.2, edge_color='black', ax=ax)
 
     # Draw the source
-    options = {"node_size": 350, "node_shape": 's', "node_color": cmap(norm(risks[source]))}
+    options = {"node_size": 350, "node_shape": 's', "node_color": cmap(norm(entity_atts[source]))}
     src_node = nx.draw_networkx_nodes(g, pos, nodelist=[source], ax=ax, **options)
     src_node.set_edgecolor('black')
     src_node.set_linewidth(2)
 
     # Draw Destination
     if destination is not None:
-        options = {"node_size": 350, "node_shape": 'D', "node_color": cmap(norm(risks[destination]))}
+        options = {"node_size": 350, "node_shape": 'D', "node_color": cmap(norm(entity_atts[destination]))}
         dst_node = nx.draw_networkx_nodes(g, pos, nodelist=[destination], ax=ax, **options)
         dst_node.set_edgecolor('black')
         dst_node.set_linewidth(2)
@@ -131,14 +158,16 @@ def cartesian_dist_plot(g, distances, risks, destination=None, title='', dx=1, d
                 textcoords='offset fontsize')
 
     cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, pad=0.05, shrink=0.6)
-    cbar.set_label('Mean Entity Risks', labelpad=-55)
+    cbar.set_label(cbar_label, labelpad=-55)
     ax.set_title(title)
     plt.box(False)
 
     # Set x ticks
     ax.spines['top'].set_visible(True)
-    ax.set_xlabel('Increasing Path Risk From the Source')
+    ax.set_xlabel(x_label)
     ax.get_xaxis().set_ticks(ticks=x_layers)
+
+    ax.set_aspect('auto')
 
     if plot:
         plt.show()

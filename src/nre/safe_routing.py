@@ -110,6 +110,18 @@ def safest_path(g, source, risk, target=None, pred=None, path=None):
     return distances
 
 
+def calc_risk_of_path(g, path, risk_dict):
+    """ Given a nx graphs and a list of nodes, checks for path and returns the max risk of the path"""
+
+    assert nx.is_path(g, path), "The path do not exist"
+
+    max_risk = -1
+    for node in path:
+        if risk_dict[node] > max_risk:
+            max_risk = risk_dict[node]
+    return max_risk
+
+
 def naive_mc_max(mean, cov, n_sample=1000, n_trial=100):
     """
     Calculates the expected value of multivariate gaussian Random variables given by their

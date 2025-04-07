@@ -1,3 +1,6 @@
+// This script is the original NRE demo that can read flows and render real time risks for
+// a single subnetwork. Must be run in conjunction with python server to relay risk information
+
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
 import TWEEN from '@tweenjs/tween.js'
@@ -18,7 +21,7 @@ import {makeNodes, makeConnectivityEdges, makeTopologyEdges, setNodePos, setAllE
     computeClusterParams, colormapLinear, color1, color2} from '/test/hierarchical/graphMaker.js';
 
 import {calcMove} from '/test/force/force-directed.js'
-import * as data from '/saves/net_data_medium0.json' assert {type: 'json'}; // medium1
+import * as data from '/saves/net_data_medium1.json' assert {type: 'json'}; // medium1
 
 console.log(data);
 
@@ -352,7 +355,7 @@ function init(){
     [clusterGroup, entityIndexInClus] = makeNodes(entityGeometry, routerGeometry, namesArr,  nodePosArr, funcEdges, riskArr, entityColors,
         clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( clusterGroup );
-    //console.log( entityIndexInClus)
+    //console.log( entityIndexInClus) // -> Withing cluster the index of an entity
 
     // Edges
 

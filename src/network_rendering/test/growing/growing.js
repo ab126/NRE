@@ -1,3 +1,6 @@
+// This script is used to test a subnetwork where entities are created as they are read
+// This method is currently DEPRECATED due to its complexity
+
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
 

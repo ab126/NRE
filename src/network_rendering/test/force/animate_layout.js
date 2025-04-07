@@ -1,3 +1,6 @@
+// This script is used to test forces that move entities around and give the positions
+// a meaning from risk point of view
+
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
 

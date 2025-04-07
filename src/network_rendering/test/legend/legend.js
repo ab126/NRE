@@ -1,3 +1,5 @@
+// This script is used to test the Legend Panel
+
 import * as THREE from 'three';
 
 import Stats from 'three/addons/libs/stats.module.js';

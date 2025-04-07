@@ -1,4 +1,7 @@
+// This script is to test materials and lighting 
+
 import * as THREE from 'three';
+import * as tf from '@tensorflow/tfjs'
 
 import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
@@ -8,13 +11,16 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import TWEEN from '@tweenjs/tween.js'
 
+import {addDiscreteBloom, discretisize, nonBloomed, restoreMaterial} from './postProcess.js'
+
+
 
 let persCamera, camera, cameraHelper, scene, renderer, stats;
 let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
-let uiScene, orthoCamera, sprite;
 let plane, greeter;
+let bloomPass, bloomComposer, finalComposer;
 
 const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
@@ -24,8 +30,8 @@ const sizeMult = .07;
 const nodeGeometry = new THREE.OctahedronGeometry( 0.07, 4 );
 const nodeMaterial = new THREE.MeshPhongMaterial({
     color:'#2CF604',
-    emissive:'#000000',
-    emissiveIntensity:1,
+    emissive:'#ebff6b',
+    emissiveIntensity:0.5,
     specular:'#ffffff',
     shininess:30
 });
@@ -36,33 +42,34 @@ const uniforms = {
 
 const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
     uniforms: uniforms,
-    vertexShader: document.getElementById( 'vertexShader' ).textContent,
-    fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+    vertexShader: document.getElementById( 'customVertexShader' ).textContent,
+    fragmentShader: document.getElementById( 'customFragmentShader' ).textContent,
     blending: THREE.AdditiveBlending,
     transparent: true,
 } );
-
-
-
-/*
-const edgeConnectivityMaterial = new THREE.LineBasicMaterial( {
-    color: '#830101',
-    linewidth: 1,
-    linecap: 'round', //ignored by WebGLRenderer
-    linejoin:  'round' //ignored by WebGLRenderer
-} );
-*/
-
 
 const effectController = {
     showConnectivity: true,
     animateCamera: false
 };
 
+const bloomParams = {
+    threshold: 0.58,
+    strength: 0.4,
+    radius: 0,
+    exposure: 1,
+    innerWidth : window.innerWidth,
+    innerHeight : window.innerHeight,
+};
+
+
+
 // Read planar positions
 //const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
 let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
 const nNodes = Object.keys(pos).length;
+const riskArr = Object.values(risk);
+
 
 initGUI();
 init();
@@ -103,7 +110,8 @@ function initGUI(){
     const materialData = {
         color: nodeMaterial.color.getHex(),
         emissive: nodeMaterial.emissive.getHex(),
-        specular: nodeMaterial.specular.getHex()
+        specular: nodeMaterial.specular.getHex(),
+        emissiveIntensity: nodeMaterial.emissiveIntensity
     }
 
     const meshPhongMaterialFolder = gui.addFolder('THREE.MeshPhongMaterial');
@@ -113,10 +121,15 @@ function initGUI(){
     meshPhongMaterialFolder.addColor(materialData, 'emissive').onChange(() => {
         nodeMaterial.emissive.setHex( Number(materialData.emissive.toString().replace('#', '0x')) )
     });
+    /* Doesnt work for some reason
+    meshPhongMaterialFolder.add(materialData, 'emissiveIntensity ', 0, 1).onChange(() => {
+        nodeMaterial.emissiveIntensity =  Number(materialData.emissiveIntensity);
+    });*/
     meshPhongMaterialFolder.addColor(materialData, 'specular').onChange(() => {
         nodeMaterial.specular.setHex(Number(materialData.specular.toString().replace('#', '0x')))
     });
-    meshPhongMaterialFolder.add(nodeMaterial, 'shininess', 0, 1024);
+    
+    meshPhongMaterialFolder.add(nodeMaterial, 'shininess', 0, 100);
     meshPhongMaterialFolder.add(nodeMaterial, 'wireframe');
     meshPhongMaterialFolder.add(nodeMaterial, 'wireframeLinewidth', 0, 10);
     meshPhongMaterialFolder.add(nodeMaterial, 'flatShading').onChange(() => updateMaterial());
@@ -124,6 +137,26 @@ function initGUI(){
     meshPhongMaterialFolder.add(nodeMaterial, 'reflectivity', 0, 1);
     meshPhongMaterialFolder.add(nodeMaterial, 'refractionRatio', 0, 1);
     meshPhongMaterialFolder.open();
+
+    const bloomFolder = gui.addFolder( 'bloom' );
+
+    bloomFolder.add( bloomParams, 'threshold', 0.0, 1.0 ).onChange( function ( value ) {
+
+        bloomPass.threshold = Number( value );
+
+    } );
+
+    bloomFolder.add( bloomParams, 'strength', 0.0, 3.0 ).onChange( function ( value ) {
+
+        bloomPass.strength = Number( value );
+
+    } );
+
+    gui.add( bloomParams, 'radius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+
+        bloomPass.radius = Number( value );
+
+    } );
 
 }
 
@@ -149,7 +182,6 @@ function init(){
 
     persCamera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
     persCamera.position.set(0, 0, 4);
-    console.log(persCamera.rotation);
     scene.add(persCamera);
 
     cameraHelper = new THREE.CameraHelper( persCamera );
@@ -211,8 +243,7 @@ function init(){
 
         persCamera.position.set(0, -15, 20);
         persCamera.lookAt(greeter.position);
-        persCamera.position.set(0, -15, 15)
-        console.log(greeter.position);
+        persCamera.position.set(0, -15, 15);
     } );
 
     document.addEventListener('click', panToPlane);
@@ -220,10 +251,9 @@ function init(){
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
     //scene.background = new THREE.Color( 0xc4c4c4 );
-    const light = new THREE.DirectionalLight( 0xffffff, 0.5 );
+    const light = new THREE.DirectionalLight( 0xffffff, 0.2 );
     light.position.set(1, 1, 1);
     scene.add( light );
-
     
 
     // Renderer
@@ -234,6 +264,11 @@ function init(){
     renderer.setSize( window.innerWidth, window.innerHeight );
     container.appendChild( renderer.domElement );
     renderer.setScissorTest( true );
+
+    // Posprocessing Passes
+
+    [bloomComposer, finalComposer] = addDiscreteBloom(1, [], scene, persCamera, renderer, bloomParams);
+    
 
     // Stats & Resize Window
     stats = new Stats();
@@ -326,7 +361,8 @@ function onWindowResize() {
     persCamera.updateProjectionMatrix();
 
     renderer.setSize( window.innerWidth, window.innerHeight );
-
+    bloomComposer.setSize( window.innerWidth, window.innerHeight );
+    finalComposer.setSize( window.innerWidth, window.innerHeight );
 }
 
 function updateMaterial() {
@@ -430,7 +466,7 @@ function animate() {
 
     TWEEN.update();
 
-	render();    
+	render();  
 
     stats.update();
 }
@@ -445,13 +481,20 @@ function render() {
     renderer.setScissor( window.innerWidth /4, window.innerHeight /2, window.innerWidth /2, window.innerHeight /2);
     renderer.setViewport( window.innerWidth /4, window.innerHeight /2, window.innerWidth /2, window.innerHeight /2);	
     renderer.render( scene, camera );
+    
 
     cameraHelper.visible = false;
     renderer.setClearColor( 0x000000, 1 );
     renderer.setScissor( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);
     renderer.setViewport( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);
 				
-    renderer.render( scene, persCamera );
+    //renderer.render( scene, persCamera );
+    scene.traverse(nonBloomed);
+    bloomComposer.render();  
+    scene.traverse(restoreMaterial);
+    finalComposer.render();  
+    //console.log(materials)
+    
     
 }
 

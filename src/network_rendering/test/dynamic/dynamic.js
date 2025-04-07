@@ -1,12 +1,20 @@
+// This script tests the reading calculated risks from python server
+// TODO: MAke a module and move all the socket functions there
+
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
+import TWEEN from '@tweenjs/tween.js'
 
 import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
 import vertexShader from '../../shaders/vertex.glsl.js'
 import fragmentShader from '../../shaders/fragment.glsl.js'
+import vertexShaderDefault from '../../shaders/vertex_default.glsl.js'
+import fragmentShaderDefault from '../../shaders/fragment_default.glsl.js'
 
 import {generateLegend, fontManager} from '../legend/legendMaker.js';
 import {makeNodes, makeConnectivityEdges, makeTopologyEdges, setNodePos, setAllEdgePosFromNodePos, setEdgePosFromNodePos,
@@ -14,11 +22,12 @@ import {makeNodes, makeConnectivityEdges, makeTopologyEdges, setNodePos, setAllE
 
 import {calcMove} from '../force/force-directed.js'
 import * as data from '../../saves/net_data_medium1.json' assert {type: 'json'}; // medium1
+
 console.log(data);
 
-const fontPath = 'fonts/helvetiker_regular.typeface.json';
+const fontPath = '/fonts/helvetiker_regular.typeface.json';
 
-let camera, scene, renderer, stats;
+let camera, scene, renderer, stats, greeter;
 let clusterGroup, clusMemberships, clusEdges, entityIndexInClus;
 let edgeConnectivity, edgeTopology;
 let uiScene, orthoCamera;
@@ -26,6 +35,7 @@ let ws;
 let maxLabelEntity = null;
 
 // Legend Parameters
+const makeLegend = false;
 const defWidth = 900; 
 const defHeight = 500; 
 
@@ -51,8 +61,15 @@ const connectivityMaterial = new THREE.LineBasicMaterial({
     color: '#ff2929'
 });
 
-const topologyMaterial = new THREE.LineBasicMaterial({
-    color: '#fbff29'
+let topologyMaterial = new THREE.LineBasicMaterial({
+    color: '#fbff29',
+    linewidth: 0.5
+});
+
+topologyMaterial = new THREE.ShaderMaterial({
+    vertexShader: vertexShaderDefault,
+    fragmentShader: fragmentShaderDefault,
+    transparent: true,
 });
 
 
@@ -76,7 +93,6 @@ const indDict = {}; // Dictionary of {name:index}
 for (let i = 0; i < nNodes; i++) {
     indDict[namesArr[i]] = i;
 }
-let nNew;
 
 let stepSize = effectController.stepSize;
 let dt = stepSize / (effectController.maxIter + 1);
@@ -85,7 +101,6 @@ const bounds = {upper:[2.5, 2.5], lower:[-2.5, -2.5]};
 
 const nFrame = 2;
 let counter = 0;
-
 
 
 init();
@@ -114,8 +129,7 @@ function connectWebSocket(){
         riskArr = obj.riskArr;
         riskCov = obj.riskCov;
         topologyEdges = obj.topologyEdges;
-        nNew = obj.newEntities;
-        console.log(obj)
+
 
 
         const streamNames = obj.names;
@@ -224,7 +238,7 @@ function initGUI(){
 
     basic.add( effectController, 'activateForce' );
 
-    //basic.close();
+    basic.close();
 
     const loadData = gui.addFolder('Load Data');
 
@@ -235,18 +249,28 @@ function initGUI(){
 }
 
 function init(){ 
-    
     initGUI();
-    
+
     // Scene & Camera
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-    camera.position.z = 4;
+    //camera.position.z = 4;
+    camera.position.set(0, 0, 4);
+    camera.lookAt(0, 0, 0);
     scene.add(camera);
 
+    uiScene = new THREE.Scene();
+    orthoCamera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, .1, 2 );
+
     // Legend
-    [uiScene, orthoCamera] = generateLegend(fontPath, entityGeometry, routerGeometry, nodeMaterial, connectivityMaterial, topologyMaterial);
-    
+    if (makeLegend) {
+        [uiScene, orthoCamera] = generateLegend(fontPath, entityGeometry, routerGeometry, nodeMaterial, connectivityMaterial, topologyMaterial);
+        const uiLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+        uiLight.position.set(1, 1, 1);
+        uiScene.add( uiLight );
+        uiScene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
+    }
+   
     // Lights
     scene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
     //scene.background = new THREE.Color( 0xc4c4c4 );
@@ -254,12 +278,6 @@ function init(){
     const light = new THREE.DirectionalLight( 0xffffff, 0.5 );
     light.position.set(1, 1, 1);
     scene.add( light );
-
-    const uiLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
-    uiLight.position.set(1, 1, 1);
-    uiScene.add( uiLight );
-
-    uiScene.add( new THREE.AmbientLight( 0xf0f0f0, 1 ) );
 
     //Plane
     const planeGeometry = new THREE.PlaneGeometry( 8, 8 );
@@ -269,6 +287,7 @@ function init(){
     plane.receiveShadow = false;
     scene.add( plane );
 
+    
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.autoClear = false;
@@ -286,10 +305,10 @@ function init(){
     // Geometries & Material
     
     // Nodes
-
     [clusterGroup, entityIndexInClus] = makeNodes(entityGeometry, routerGeometry, namesArr,  nodePosArr, funcEdges, riskArr, entityColors,
         clusAssignments, extras, sizeMult, effectController.colorWithRisks); // Entity nodes and edges
     scene.add( clusterGroup );
+    //console.log( entityIndexInClus) // -> Withing cluster the index of an entity
 
     // Edges
 
@@ -307,9 +326,8 @@ function init(){
     // Cluster parameters
     [clusMemberships, clusEdges] = computeClusterParams(clusterGroup, funcEdges, clusAssignments, indDict);
     
-    
-    
 }
+
 
 
 function onWindowResize() {
@@ -400,7 +418,7 @@ function labelMaxRisk(riskArr, maxLabelEntity, clusterGroup){
         oldEntity.remove(oldEntity.children[0]);
         
         // Add the text
-        let size = 0.05;
+        let size = 0.1; // 0.05
         const fm = new fontManager(fontPath);
         const liteMat = new THREE.MeshBasicMaterial( {
             color: 0xffffff,
@@ -455,6 +473,8 @@ function moveNodes(clusterGroup, allPosArr, allEdgeWeights, clusMemberships, ste
 function animate() {
     
     requestAnimationFrame( animate );
+
+    TWEEN.update();
 
     render();
 

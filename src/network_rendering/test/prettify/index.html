@@ -11,7 +11,7 @@
 	
 
 	<body>
-		<script id="vertexShader" type="x-shader/x-vertex">
+		<script id="customVertexShader" type="x-shader/x-vertex">
 
 			precision mediump float;
 			precision mediump int;
@@ -32,7 +32,7 @@
 
 		</script>
 
-		<script id="fragmentShader" type="x-shader/x-fragment">
+		<script id="customFragmentShader" type="x-shader/x-fragment">
 
 			precision mediump float;
 			precision mediump int;
@@ -53,37 +53,30 @@
 
 		</script>		
 		
-		<script type="x-shader/x-vertex" id="vertexshader">
+		<script type="x-shader/x-vertex" id="vertexShader">
 
-			uniform float amplitude;
-
-			attribute vec3 displacement;
-			attribute vec3 customColor;
-
-			varying vec3 vColor;
+			varying vec2 vUv;
 
 			void main() {
 
-				vec3 newPosition = position + amplitude * displacement;
+				vUv = uv;
 
-				vColor = customColor;
-
-				gl_Position = projectionMatrix * modelViewMatrix * vec4( newPosition, 1.0 );
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 
 			}
 
 		</script>
 
-		<script type="x-shader/x-fragment" id="fragmentshader">
+		<script type="x-shader/x-fragment" id="fragmentShader">
 
-			uniform vec3 color;
-			uniform float opacity;
+			uniform sampler2D baseTexture;
+			uniform sampler2D bloomTexture;
 
-			varying vec3 vColor;
+			varying vec2 vUv;
 
 			void main() {
-
-				gl_FragColor = vec4( vColor * color, opacity );
+				// 				 Original Texture 				Intensity  	 *	Bloom Texture 
+				gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
 
 			}
 

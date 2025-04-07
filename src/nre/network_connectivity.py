@@ -15,7 +15,7 @@ from ordered_set import OrderedSet
 from .preprocess import preprocess_df
 from .time_windowed import get_window
 import scipy.fft
-from pomegranate.bayesian_network import BayesianNetwork
+#from pomegranate.bayesian_network import BayesianNetwork # Dont use pomegranate it requires Numpy 2.1!
 
 MIN_SAMPLES = 5  # Minimum number of samples required for connectivity graph calculation
 
@@ -329,7 +329,8 @@ class ConnectivityUnit:
             assert control_dict is not None, "No control set samples provided"
             for cont_name, cont_samples in control_dict.items():
                 assert len(cont_samples) == self.samples.shape[
-                    0], "Number of samples in control set does not match target samples"
+                    0], "Number of samples in control set does not match target samples {},{}".format(len(cont_samples), self.samples.shape[
+                    0])
                 self.control_names.append(cont_name)
 
             # Form data df

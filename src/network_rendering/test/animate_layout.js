@@ -1,3 +1,5 @@
+// This on is totally deprecated ...
+
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
 
@@ -7,7 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import vertexShader from '../shaders/vertex.glsl.js'
 import fragmentShader from '../shaders/fragment.glsl.js'
 
-import * as data from '../saves/net_data_small.json' assert {type: 'json'}; // 63
+import * as data from '../saves/net_data_medium1.json' assert {type: 'json'}; // 63
 import {singleStepForceDirected} from './force-directed.js'
 
 console.log(data)

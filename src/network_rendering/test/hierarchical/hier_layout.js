@@ -1,3 +1,6 @@
+// This script is used to test hierarchical (subnetworks within network) definition of
+// entities and all other related element
+
 import * as THREE from 'three';
 import * as tf from '@tensorflow/tfjs';
 
