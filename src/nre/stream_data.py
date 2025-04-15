@@ -26,7 +26,7 @@ def start_web_socket_server():
 
 def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=False, src_id_col=' Source IP',
                  dst_id_col=' Destination IP', graph_conn_size=150, conn_size=3, t_graph=4, t_sync=0.5,
-                 forget_factor=0.5, relief_factor=0.7, display_time=3, save_mode=False, save_dir=None):
+                 forget_factor=0.5, relief_factor=0.7, display_time=3, save_mode=None, save_dir=None):
     """
     Sets up the server and starts streaming data
 
@@ -44,14 +44,21 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
     :param forget_factor:
     :param relief_factor:
     :param display_time: Amount of time the graph is displayed on the rendering end
+    :param save_mode: If save_mode == 'single' saves stream data into single json, else saves into separate files
+    :param save_dir: Save directory
     :return:
     """
     n_entities = len(entity_names)
     k = 0
-    if save_mode:
-        print(os.getcwd())
+    if save_mode is not None:
+        # print(os.getcwd())
         if save_dir is None:
             save_dir = "./stream_data"
+        if save_mode == 'single':
+            with open("{}/render_data_all.json".format(save_dir), "w") as file:
+                # The 'indent' parameter is optional, but it makes the JSON file more readable
+                json.dump('{}', file)  # , indent=4)
+
 
     for _ in range(1000):  # For x runs
 
@@ -84,7 +91,7 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 
             if start_of_df and not grow_entities:  # Initial Run
                 start_of_df = False
-                time.sleep(display_time/2)
+                time.sleep(display_time / 2)
                 continue
             else:
                 if window_type == 'time':
@@ -134,17 +141,40 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
                                           'nFlows': [n_flows], 'timeStamp': [current_datetime.strftime('%X')],
                                           'topologyEdges': edges_list, 'newEntities': n_new})
 
-
-
             #
             try:
                 ws.send_message(ws.clients[0], json_string)
-                if save_mode:
 
-                    with open("{}/render_data_{:03d}.json".format(save_dir, k), "w") as file:
-                        # The 'indent' parameter is optional, but it makes the JSON file more readable
-                        json.dump(json_string, file)  # , indent=4)
-                        k += 1
+                if save_mode is not None:
+                    if save_mode == 'single':
+
+                        try:
+                            with open("{}/render_data_all.json".format(save_dir), "r") as file:
+                                prev_json_string = json.load(file)
+                                prev_json = json.loads(prev_json_string)
+
+                            print('Previous:', prev_json.keys())
+
+                            curr_json = json.loads(json_string)
+                            new_json = prev_json.copy()
+                            print('Current:', curr_json.keys())
+                            new_json[str(k)] = curr_json
+                            print('Updated:', new_json.keys())
+                            all_json_string = json.dumps(new_json)
+                            # print('Updated String:', len(all_json_string))
+                            with open("{}/render_data_all.json".format(save_dir), "w") as file:
+                                # The 'indent' parameter is optional, but it makes the JSON file more readable
+                                json.dump(all_json_string, file)  # , indent=4)
+                                k += 1
+                        except Exception as e:
+                            # Handle any other unexpected exceptions
+                            print(f"Something went wrong: {e}")
+
+                    else:
+                        with open("{}/render_data_{:03d}.json".format(save_dir, k), "w") as file:
+                            # The 'indent' parameter is optional, but it makes the JSON file more readable
+                            json.dump(json_string, file)  # , indent=4)
+                            k += 1
             except:
                 break
             # server.send_message_to_all(jsonstring)
