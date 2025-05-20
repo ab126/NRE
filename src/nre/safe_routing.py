@@ -1,3 +1,4 @@
+import pickle
 import warnings
 
 import numpy as np
@@ -9,9 +10,11 @@ import matplotlib
 import scipy
 from heapq import heappop, heappush
 from itertools import count
+from tqdm import tqdm
 
 from scipy.stats import multivariate_normal as mvn
 
+from src.nre.kalman_network_tools import get_risk_mat_from_df
 from .network_connectivity import get_all_entities
 
 
@@ -87,7 +90,7 @@ def safest_path(g, source, risk, target=None, pred=None, path=None):
             break
 
         for u in g[v]:
-            d_u_new = max(d, risk[u])  # TODO: Add general distance function here
+            d_u_new = max(d, risk[u])  # TODO: Add generalized distance function here
 
             if u in distances:  # in final distances
                 d_u_prev = distances[u]
@@ -116,11 +119,190 @@ def calc_risk_of_path(g, path, risk_dict):
     assert nx.is_path(g, path), "The path do not exist"
 
     max_risk = -1
-    for node in path:
-        if risk_dict[node] > max_risk:
-            max_risk = risk_dict[node]
+    if len(path) > 0:
+        max_risk = np.max([risk_dict[node] for node in path])
     return max_risk
 
+
+def get_safe_routing_perf_stats(g, entity_risks, return_idv=True):
+    """
+    Computed average reduction in risk and average loss of number of hops for all pairs of src, dst in graph g.
+    If return_idv == True, returns the results for individual pairs of src, dst"""
+
+    res_df = pd.DataFrame()
+
+    for src in g.nodes:
+        # All needed paths from source to every node
+        min_risk_paths = {node: [src] for node in g.nodes}
+        min_hop_paths = nx.shortest_path(g, source=src)
+        risk_distances = safest_path(g, src, entity_risks, path=min_risk_paths)
+        hop_dist = nx.shortest_path_length(g, source=src)
+
+        np.testing.assert_allclose([hop_dist[node] for node in g.nodes],
+                                   [len(min_hop_paths[node]) - 1 for node in g.nodes],
+                                   err_msg='Shortest path distances do not match')
+        risk_distances.pop(src)
+        hop_dist.pop(src)
+        min_risk_paths.pop(src)
+        min_hop_paths.pop(src)
+
+        for dst in risk_distances:  # hop_dist
+
+            # Risk and Hop Distances of alternate paths
+            alternate_risk_distance = calc_risk_of_path(g, min_hop_paths[dst],
+                                                        entity_risks)  # Min hop path to destination
+            alternate_hop_distance = len(min_risk_paths[dst]) - 1  # Min risk path to destination
+
+            risk_reduction_perc = (alternate_risk_distance - risk_distances[dst]) / alternate_risk_distance * 100
+            hop_inc_perc = (alternate_hop_distance - hop_dist[dst]) / hop_dist[dst] * 100
+            temp_df = pd.DataFrame({'Source': src, 'Destination': dst, 'Risk Reduction %': risk_reduction_perc,
+                                    'Increase in Hops %': hop_inc_perc}, index=[0])
+            res_df = pd.concat((res_df, temp_df), ignore_index=True)
+
+    avg_risk_reduction_perc = np.mean(res_df['Risk Reduction %'])
+    avg_hop_inc_perc = np.mean(res_df['Increase in Hops %'])
+
+    if not return_idv:
+        res_df = pd.DataFrame({'Average Risk Reduction %': avg_risk_reduction_perc,
+                               'Average Increase in Hops %': avg_hop_inc_perc}, index=[0])
+    return res_df
+
+
+def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=250, verbose=True):
+    """
+    Compares different topologies for the safe routing problem. The graph is sampled/computed from the distribution
+    and risks are assigned as the dominant eigenvector of the resulting topology which is the stationary
+    risk-distribution. Security gain is gauged by % reduction in risk and performance loss is gauged by % increase
+    in # of hops.
+    """
+    res_df = pd.DataFrame()
+    graph_col_name = 'Graph Model'
+
+    print("Erdos-Renyi Graphs") if verbose else None
+    for c in params['c']:
+        for i in tqdm(range(n_iter), disable=not verbose):
+            # Make Graph and get the risk distribution
+            g = sample_erdos_renyi_graph(n_size, c)
+            entity_risks = _get_stationary_entity_risk(g)
+
+            # Simple Safe-Routing Solution
+            temp_df = get_safe_routing_perf_stats(g, entity_risks)
+            temp_df['Iteration'] = i
+            temp_df[graph_col_name] = 'Erdos-Renyi'
+
+            res_df = pd.concat((res_df, temp_df), ignore_index=True)
+
+    # Preferential Attachment Model
+    print("Barabasi-Albert Graphs") if verbose else None
+    for c in params['c']:
+        for i in tqdm(range(n_iter), disable=not verbose):
+            # Make Graph and get the risk distribution
+            g = sample_barabasi_albert_graph(n_size, c)
+            entity_risks = _get_stationary_entity_risk(g)
+
+            # Simple Safe-Routing Solution
+            temp_df = get_safe_routing_perf_stats(g, entity_risks)
+            temp_df['Iteration'] = i
+            temp_df[graph_col_name] = 'Barabasi-Albert'
+
+            res_df = pd.concat((res_df, temp_df), ignore_index=True)
+
+    # Small World Model
+    print("Watts-Strogatz Graphs") if verbose else None
+    for c in params['c']:
+        for p_rewire in params['p_rewire']:
+            for i in tqdm(range(n_iter), disable=not verbose):
+                # Make Graph and get the risk distribution
+                g = sample_watts_strogatz_graph(n_size, c, p_rewire)
+                entity_risks = _get_stationary_entity_risk(g)
+
+                # Simple Safe-Routing Solution
+                temp_df = get_safe_routing_perf_stats(g, entity_risks)
+                temp_df['Iteration'] = i
+                temp_df[graph_col_name] = 'Watts-Strogatz'
+
+                res_df = pd.concat((res_df, temp_df), ignore_index=True)
+
+    if df is None:
+        return res_df
+
+    # Observed Network from data
+    print("Time windowed observed Network") if verbose else None
+    with open(r'saves\connected_84.pickle', 'rb') as handle:
+        entity_names = pickle.load(handle)
+    risk_mat, labels, label_counts, all_graphs, entity_names = get_risk_mat_from_df(df, entity_names=entity_names,
+                                                                                    t_graph=90, sync_window_size=1.2,
+                                                                                    verbose=verbose)
+    for i in range(risk_mat.shape[0]):
+        risk_mean = risk_mat[i, :]
+        mat_f = all_graphs[i, :, :]
+
+        # Form networkx graph
+        g = nx.from_numpy_array(mat_f)
+        name_mapping = {i: entity_names[i] for i in range(len(entity_names))}
+        g = nx.relabel_nodes(g, name_mapping)
+        entity_risks = {entity_names[i]:risk_mean[i] for i in range(len(entity_names))}
+
+        # Simple Safe-Routing Solution
+        temp_df = get_safe_routing_perf_stats(g, entity_risks)
+        temp_df['Iteration'] = i
+        temp_df[graph_col_name] = 'CIC-IDS-2017'
+
+        res_df = pd.concat((res_df, temp_df), ignore_index=True)
+
+    return res_df
+
+
+# Monte Carlo Helpers
+def _get_stationary_entity_risk(g):
+    """ Return the stationary risk distribution given the underlying topology g"""
+    entity_names = list(g.nodes)
+    mat_f = nx.to_numpy_array(g, nodelist=entity_names) + np.eye(len(g))
+
+    eig_vals, eig_vecs = np.linalg.eig(mat_f)
+    ind = np.argsort(eig_vals)
+    risk_mean = np.abs(eig_vecs[:, ind[-1]])  # Dominant Eigenvector
+    return {node: risk for node, risk in zip(g.nodes, risk_mean)}
+
+
+def sample_erdos_renyi_graph(n_size, c, seed=None):
+    """ Samples an ER graph with parameters relating to its connectedness criterion (c>1 results in connected graph
+    with high probability)"""
+
+    p_er = c * np.log(n_size) / n_size
+    g = nx.erdos_renyi_graph(n_size, p_er, seed=seed)
+
+    # Giant Component
+    g = g.subgraph(max(nx.connected_components(g), key=len))
+    return g
+
+
+def sample_barabasi_albert_graph(n_size, c, seed=None):
+    """ Samples a Barabasi-Albery preferential attachment graph. Number of edges to attach to new node is selected so
+     that it matches the expected number of edges in Erdos Renyi graph with critical parameters c"""
+    p_er = c * np.log(n_size) / n_size
+    m = int(n_size * p_er)
+    g = nx.barabasi_albert_graph(n_size, m, seed=seed)
+
+    # Pick Giant Component
+    g = g.subgraph(max(nx.connected_components(g), key=len))
+    return g
+
+
+def sample_watts_strogatz_graph(n_size, c, p_rewire, seed=None):
+    """ Samples a Watts Strogatz small world graph. Initial number of edges to attach to a node is selected so
+     that it matches the expected number of edges in Erdos Renyi graph with critical parameters c"""
+    p_er = c * np.log(n_size) / n_size
+    k = 2 * (int(n_size * p_er) // 2)
+
+    g = nx.watts_strogatz_graph(n_size, k, p_rewire, seed=seed)
+
+    # Pick Giant Component
+    g = g.subgraph(max(nx.connected_components(g), key=len))
+    return g
+
+
+# Max of Multivariate Gaussians
 
 def naive_mc_max(mean, cov, n_sample=1000, n_trial=100):
     """
