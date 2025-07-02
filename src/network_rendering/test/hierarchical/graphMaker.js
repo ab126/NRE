@@ -6,7 +6,8 @@ export const color2 = new THREE.Color(246, 4, 4);
 
 // Makes and returns the entity Group
 export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, funcEdges, riskArr,
-     entityColors, clusAssignment, extras, sizeMult=.5, colorWithRisks=true, entitySampleMaterial=null){
+     entityColors, clusAssignment, extras, sizeMult=.5, colorWithRisks=true, entitySampleMaterial=null,
+     nodeMaterials=null, nreOn=true){
     
     const entityClustersGroup = new THREE.Group(); // Center of group is mean center of elements
     const nMembers = [];
@@ -16,6 +17,7 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
     const nEntities = posArr.length;
     const nodeColors = new Float32Array( nEntities * 4 );
     const degrees = Array(nEntities);
+
 
     if (entitySampleMaterial == null) {
         entitySampleMaterial = new THREE.MeshPhongMaterial({
@@ -66,12 +68,26 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
     }
 
     // Add entities to the entityClusterGroup
-    for ( let i = 0, entityName, sizeScale, entitySampleMaterial, entity; i < nEntities; i ++ ){
+    for ( let i = 0, entityName, entityMaterial, sizeScale, entity; i < nEntities; i ++ ){
 
         entityName = namesArr[i];       
         sizeScale = 1 //+ sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);
+        entityMaterial = new THREE.MeshPhongMaterial({
+                        color: entitySampleMaterial.color,
+                        emissive: entitySampleMaterial.emissive,
+                        emissiveIntensity: entitySampleMaterial.emissiveIntensity,
+                        specular: entitySampleMaterial.specular,
+                        shininess: entitySampleMaterial.shininess
+        });
+        if (nreOn){
+            entityMaterial.emissive.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2] );
+        }
+        
+        if (nodeMaterials !== null) {            
+            nodeMaterials.push(entityMaterial);
+        } 
 
-        entity = new THREE.Mesh( entityGeometry, entitySampleMaterial );
+        entity = new THREE.Mesh( entityGeometry, entityMaterial );
         //entity.scale.set(sizeScale, sizeScale, sizeScale);
         if (i % 3 == 0){
             entity.geometry = routerGeometry;
@@ -83,6 +99,9 @@ export function makeNodes(entityGeometry, routerGeometry, namesArr,  posArr, fun
         entity.position.add( clusCenters[ clusIndex].clone().negate()  );
         entity.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entity.name = entityName;
+        if (!nreOn){
+            entity.material.color.setRGB(0, 0, 0);
+        }
 
         entityIndexInClus.push( entityClustersGroup.children[ clusIndex].children.length);
         entityClustersGroup.children[ clusIndex].add( entity );

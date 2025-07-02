@@ -11,8 +11,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import TWEEN from '@tweenjs/tween.js'
 
-import {addDiscreteBloom, discretisize, nonBloomed, restoreMaterial} from './postProcess.js'
-
+import {addEntityBloom,  nonBloomed, restoreMaterial} from './postProcess.js'
 
 
 let persCamera, camera, cameraHelper, scene, renderer, stats;
@@ -20,7 +19,7 @@ let entityGroup;
 let nodeColors, nodePosArray, nodeSizes;
 let edgeConnectivity, edgeColors, edgePos;
 let plane, greeter;
-let bloomPass, bloomComposer, finalComposer;
+let bloomComposer, finalComposer, bloomPass, bloomLayer;
 
 const fontPath = 'fonts/helvetiker_regular.typeface.json';
 
@@ -29,16 +28,18 @@ const baseSize = 0.03; //0.05
 const sizeMult = .07;
 const nodeGeometry = new THREE.OctahedronGeometry( 0.07, 4 );
 const nodeMaterial = new THREE.MeshPhongMaterial({
-    color:'#2CF604',
-    emissive:'#ebff6b',
-    emissiveIntensity:0.5,
-    specular:'#ffffff',
+    color: '#2CF604',
+    emissive: '#6bdaff',
+    emissiveIntensity: 3,
+    specular: '#ffffff',
     shininess:30
 });
+const nodeMaterials = [];
 
 const uniforms = {
     time : { value: 0.0 },
 };
+
 
 const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
     uniforms: uniforms,
@@ -48,31 +49,37 @@ const edgeConnectivityMaterial = new THREE.ShaderMaterial( {
     transparent: true,
 } );
 
+/*
+const edgeConnectivityMaterial = new THREE.LineBasicMaterial({
+    color: '#bd0000'
+});*/
+
 const effectController = {
     showConnectivity: true,
     animateCamera: false
 };
 
-const bloomParams = {
-    threshold: 0.58,
-    strength: 0.4,
-    radius: 0,
-    exposure: 1,
+const nLevels = 1;
+const ppParams = {
+    threshold: -0.6, // -0.6
+    strength: 0.515, // 1.29
+    radius: 0.37, // 0.37
+    exposure: 1.0, // 1.0
     innerWidth : window.innerWidth,
     innerHeight : window.innerHeight,
+    emmisiveIntensity: nodeMaterial.emissiveIntensity
 };
-
-
 
 // Read planar positions
 //const {pos, topologyEdges, risk_mean, risk_cov, funcEdges, entityColors, extras} = data
-let {pos, risk, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
+let {pos, risk, riskCov, edges, entityColors, extras} = generateSampleNet(0, 0 ,2);
 const nNodes = Object.keys(pos).length;
 const riskArr = Object.values(risk);
+//console.log(riskCov)
 
 
-initGUI();
 init();
+initGUI();
 animate();
 
 function initGUI(){
@@ -92,9 +99,7 @@ function initGUI(){
     const gui = new GUI();
 
     gui.add( effectController, 'showConnectivity' ).onChange( function ( value ) {
-
         edgeConnectivity.visible = value;
-
     } );
 
     const materialFolder = gui.addFolder('THREE.Material');
@@ -116,17 +121,20 @@ function initGUI(){
 
     const meshPhongMaterialFolder = gui.addFolder('THREE.MeshPhongMaterial');
     meshPhongMaterialFolder.addColor(materialData, 'color').onChange(() => {
-        nodeMaterial.color.setHex(Number(materialData.color.toString().replace('#', '0x')))
+        //nodeMaterial.color.setHex(Number(materialData.color.toString().replace('#', '0x')));
+        nodeMaterials.forEach(material => {material.color.setHex(Number(materialData.color.toString().replace('#', '0x')));});
     });
     meshPhongMaterialFolder.addColor(materialData, 'emissive').onChange(() => {
-        nodeMaterial.emissive.setHex( Number(materialData.emissive.toString().replace('#', '0x')) )
+        //nodeMaterial.emissive.setHex( Number(materialData.emissive.toString().replace('#', '0x')) );
+        nodeMaterials.forEach(material => {material.emissive.setHex( Number(materialData.emissive.toString().replace('#', '0x')) );});
     });
-    /* Doesnt work for some reason
-    meshPhongMaterialFolder.add(materialData, 'emissiveIntensity ', 0, 1).onChange(() => {
-        nodeMaterial.emissiveIntensity =  Number(materialData.emissiveIntensity);
-    });*/
+    meshPhongMaterialFolder.add(materialData, 'emissiveIntensity', 0, 6).onChange(() => {
+        nodeMaterials.forEach((material) => {material.emissiveIntensity = materialData.emissiveIntensity * material.emissiveMultiplier});
+        //nodeMaterial.emissiveIntensity =  Number(materialData.emissiveIntensity);
+    });
     meshPhongMaterialFolder.addColor(materialData, 'specular').onChange(() => {
-        nodeMaterial.specular.setHex(Number(materialData.specular.toString().replace('#', '0x')))
+        nodeMaterials.forEach(material => {material.specular.setHex(Number(materialData.specular.toString().replace('#', '0x')));});
+        //nodeMaterial.specular.setHex(Number(materialData.specular.toString().replace('#', '0x')))
     });
     
     meshPhongMaterialFolder.add(nodeMaterial, 'shininess', 0, 100);
@@ -137,25 +145,22 @@ function initGUI(){
     meshPhongMaterialFolder.add(nodeMaterial, 'reflectivity', 0, 1);
     meshPhongMaterialFolder.add(nodeMaterial, 'refractionRatio', 0, 1);
     meshPhongMaterialFolder.open();
+    meshPhongMaterialFolder.close();
 
-    const bloomFolder = gui.addFolder( 'bloom' );
-
-    bloomFolder.add( bloomParams, 'threshold', 0.0, 1.0 ).onChange( function ( value ) {
-
+    const nodeBloomFolder = gui.addFolder( 'Node Bloom' );
+    nodeBloomFolder.add( ppParams, 'threshold', -1.0, 1.0 ).onChange( function ( value ) {
         bloomPass.threshold = Number( value );
-
     } );
-
-    bloomFolder.add( bloomParams, 'strength', 0.0, 3.0 ).onChange( function ( value ) {
-
+    nodeBloomFolder.add( ppParams, 'strength', 0.0, 5.0 ).onChange( function ( value ) {  
         bloomPass.strength = Number( value );
-
+    } );
+    nodeBloomFolder.add( ppParams, 'radius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+        bloomPass.radius = Number( value );
     } );
 
-    gui.add( bloomParams, 'radius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
-
-        bloomPass.radius = Number( value );
-
+    const toneMappingFolder = gui.addFolder( 'tone mapping' );
+    toneMappingFolder.add( ppParams, 'exposure', 0.1, 2 ).onChange( function ( value ) {
+        renderer.toneMappingExposure = Math.pow( value, 4.0 );
     } );
 
 }
@@ -264,11 +269,9 @@ function init(){
     renderer.setSize( window.innerWidth, window.innerHeight );
     container.appendChild( renderer.domElement );
     renderer.setScissorTest( true );
-
-    // Posprocessing Passes
-
-    [bloomComposer, finalComposer] = addDiscreteBloom(1, [], scene, persCamera, renderer, bloomParams);
-    
+    renderer.toneMapping = THREE.CineonToneMapping;
+    renderer.toneMappingExposure = Math.pow( ppParams.exposure, 4.0 );
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     // Stats & Resize Window
     stats = new Stats();
@@ -276,10 +279,8 @@ function init(){
 
     window.addEventListener( 'resize', onWindowResize );
 
-    // Geometries & Material
-    
+    // Geometries & Material    
     // Nodes
-
     entityGroup = new THREE.Group(); // Entity nodes and edges
     scene.add( entityGroup );
     
@@ -308,10 +309,20 @@ function init(){
     for ( let i = 0; i < nNodes; i ++ ) {
         nodeSizes[i] = baseSize + sizeMult * (degrees[i] - minDeg) / (maxDeg - minDeg);        
 
-        const node = new THREE.Mesh( nodeGeometry, nodeMaterial );
+        const nodeTestMaterial = new THREE.MeshPhongMaterial({
+            color: nodeMaterial.color,
+            emissive: nodeMaterial.emissive,
+            emissiveIntensity: nodeMaterial.emissiveIntensity,
+            specular: nodeMaterial.specular,
+            shininess: nodeMaterial.shininess
+        });
+        nodeMaterials.push(nodeTestMaterial);
+        const node = new THREE.Mesh( nodeGeometry, nodeTestMaterial );
         node.rotateX(Math.PI /2);
 
         node.position.set(nodePosArray[i][0], nodePosArray[i][1], 0);
+        //node.material.emissiveMultiplier = Math.pow((i+1)/4, 3);
+        //node.material.emissiveIntensity = nodeMaterial.emissiveIntensity * node.material.emissiveMultiplier;
         //node.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         //node.material.color.setRGB(nodeColors[ 4 * i ], nodeColors[ 4 * i + 1], nodeColors[ 4 * i + 2]);
         entityGroup.add( node );
@@ -329,8 +340,14 @@ function init(){
     scene.add( edgeConnectivity );
     edgeConnectivity.visible = effectController.showConnectivity;
 
-    //const controls = new OrbitControls( persCamera, renderer.domElement );   
-    //controls.target.set(0, 0, 0);
+    const controls = new OrbitControls( persCamera, renderer.domElement );   
+    controls.target.set(0, 0, 0);
+
+    // Posprocessing Passes
+    [bloomComposer, finalComposer, bloomPass, bloomLayer, ] = addEntityBloom(riskCov, entityGroup, scene, persCamera, renderer, ppParams);
+    //console.log(bloomLayer.idx);
+    edgeConnectivity.layers.enable(bloomLayer.idx);
+    console.log(riskCov);
 }
 
 // Pans the camera to the initial plane
@@ -377,11 +394,12 @@ function generateSampleNet(xCenter, yCenter = 0, diam = 2){
     let pos = {a: [xCenter, yCenter], b: [xCenter, yCenter + diam/2], c: [xCenter - diam/2, yCenter - diam/2],
                 d: [xCenter + diam/2, yCenter - diam/2]};
     let risk = {a: 0, b:1, c:2, d:3};
+    let riskCov = [[1.2, 0.1, 0, 0], [0.1, 2, -1, -0.1], [0, -1, 0.2, 0], [0, -0.1, 0, 0.5]];
     let edges = [ [0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]];
     let entityColors = {a:[0.8, 0.2, 1, 1], b:[0, 1, 1, 1], c:[0.2, 0.8, 1, 1], d:[0.6, 0.4, 1, 1]};
     let extras = {diam_z: 2, radius:1}
 
-    return {pos, risk, edges, entityColors, extras}
+    return {pos, risk, riskCov, edges, entityColors, extras}
 }
 
 
@@ -466,35 +484,36 @@ function animate() {
 
     TWEEN.update();
 
-	render();  
-
     stats.update();
+
+	render();  
+    
 }
 
 function render() {
 
     uniforms.time.value += 0.01;
-    
 
+    // Top Scene
     cameraHelper.visible = true;
     renderer.setClearColor( 0x111111, 1 );
     renderer.setScissor( window.innerWidth /4, window.innerHeight /2, window.innerWidth /2, window.innerHeight /2);
     renderer.setViewport( window.innerWidth /4, window.innerHeight /2, window.innerWidth /2, window.innerHeight /2);	
     renderer.render( scene, camera );
-    
 
+    // Bottom Scene
     cameraHelper.visible = false;
     renderer.setClearColor( 0x000000, 1 );
     renderer.setScissor( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);
     renderer.setViewport( window.innerWidth /4, 0, window.innerWidth /2, window.innerHeight /2);
 				
     //renderer.render( scene, persCamera );
-    scene.traverse(nonBloomed);
+    //scene.traverse((obj) => {nonBloomedMulti(obj, bloomLayers)});
+    scene.traverse((obj) => {nonBloomed(obj, bloomLayer)});
     bloomComposer.render();  
     scene.traverse(restoreMaterial);
     finalComposer.render();  
-    //console.log(materials)
-    
+    //console.log(materials)   
     
 }
 

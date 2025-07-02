@@ -19,20 +19,27 @@ export class fontManager{
             const shapes = font.generateShapes(message, size);
             const geometry = new THREE.ShapeGeometry( shapes );
             const text = new THREE.Mesh( geometry, textMaterial );
+            const textObj = new THREE.Object3D();
+            textObj.rotation.set(0, 0, 0);
+            textObj.up.set(0, 0, 1);
+            //textObj.position.set(0, 0, 0);
+
             if (scale == null) {
                 text.scale.set(0.6, 1, 1);
             } else {
                 text.scale.set(...scale);
             }         
-            text.position.set(...textPos); 
-            if (group2Add != null) {
-                group2Add.add( text );
-            }
             if (textRot != null) {
                 text.rotation.set(...textRot);
+                //textObj.rotation.set(...textRot);
             }
-    
-            //animate();
+            text.position.set(...textPos); 
+            
+            textObj.add(text);
+            
+            if (group2Add != null) {
+                group2Add.add( textObj );
+            }
     
         } );
     }

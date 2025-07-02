@@ -109,7 +109,8 @@ def safest_path(g, source, risk, target=None, pred=None, path=None):
                 if pred is not None:
                     pred[u].append(v)
                 if path is not None:
-                    warnings.warn('Multi-safest-paths are not added to variable path!')
+                    # warnings.warn('Multi-safest-paths are not added to path variable!')
+                    pass
     return distances
 
 
@@ -168,7 +169,7 @@ def get_safe_routing_perf_stats(g, entity_risks, return_idv=True):
     return res_df
 
 
-def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=250, verbose=True):
+def compare_topologies_simple_safe_routing(params, df=None, n_size=30, n_iter=250, verbose=True):
     """
     Compares different topologies for the safe routing problem. The graph is sampled/computed from the distribution
     and risks are assigned as the dominant eigenvector of the resulting topology which is the stationary
@@ -177,9 +178,11 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=25
     """
     res_df = pd.DataFrame()
     graph_col_name = 'Graph Model'
+    param_str = ''
 
     print("Erdos-Renyi Graphs") if verbose else None
     for c in params['c']:
+        param_str = f'c={c}'
         for i in tqdm(range(n_iter), disable=not verbose):
             # Make Graph and get the risk distribution
             g = sample_erdos_renyi_graph(n_size, c)
@@ -189,12 +192,14 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=25
             temp_df = get_safe_routing_perf_stats(g, entity_risks)
             temp_df['Iteration'] = i
             temp_df[graph_col_name] = 'Erdos-Renyi'
+            temp_df['Parameters'] = param_str
 
             res_df = pd.concat((res_df, temp_df), ignore_index=True)
 
     # Preferential Attachment Model
     print("Barabasi-Albert Graphs") if verbose else None
     for c in params['c']:
+        param_str = f'c={c}'
         for i in tqdm(range(n_iter), disable=not verbose):
             # Make Graph and get the risk distribution
             g = sample_barabasi_albert_graph(n_size, c)
@@ -204,6 +209,7 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=25
             temp_df = get_safe_routing_perf_stats(g, entity_risks)
             temp_df['Iteration'] = i
             temp_df[graph_col_name] = 'Barabasi-Albert'
+            temp_df['Parameters'] = param_str
 
             res_df = pd.concat((res_df, temp_df), ignore_index=True)
 
@@ -211,6 +217,7 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=25
     print("Watts-Strogatz Graphs") if verbose else None
     for c in params['c']:
         for p_rewire in params['p_rewire']:
+            param_str = f'c={c}, p_rewire={p_rewire}'
             for i in tqdm(range(n_iter), disable=not verbose):
                 # Make Graph and get the risk distribution
                 g = sample_watts_strogatz_graph(n_size, c, p_rewire)
@@ -220,6 +227,7 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=25
                 temp_df = get_safe_routing_perf_stats(g, entity_risks)
                 temp_df['Iteration'] = i
                 temp_df[graph_col_name] = 'Watts-Strogatz'
+                temp_df['Parameters'] = param_str
 
                 res_df = pd.concat((res_df, temp_df), ignore_index=True)
 
@@ -230,9 +238,16 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=25
     print("Time windowed observed Network") if verbose else None
     with open(r'saves\connected_84.pickle', 'rb') as handle:
         entity_names = pickle.load(handle)
+        entity_names = entity_names[:n_size]
+
+    t_graph = 90
+    sync_window_size = 1.2
     risk_mat, labels, label_counts, all_graphs, entity_names = get_risk_mat_from_df(df, entity_names=entity_names,
-                                                                                    t_graph=90, sync_window_size=1.2,
+                                                                                    t_graph=t_graph,
+                                                                                    sync_window_size=sync_window_size,
                                                                                     verbose=verbose)
+    param_str = f't_graph={t_graph}, sync_window_size={sync_window_size}'
+
     for i in range(risk_mat.shape[0]):
         risk_mean = risk_mat[i, :]
         mat_f = all_graphs[i, :, :]
@@ -247,6 +262,7 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=84, n_iter=25
         temp_df = get_safe_routing_perf_stats(g, entity_risks)
         temp_df['Iteration'] = i
         temp_df[graph_col_name] = 'CIC-IDS-2017'
+        temp_df['Parameters'] = param_str
 
         res_df = pd.concat((res_df, temp_df), ignore_index=True)
 

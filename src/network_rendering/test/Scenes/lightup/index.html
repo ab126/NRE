@@ -11,22 +11,11 @@
 
 		<script id="vertexShader" type="x-shader/x-vertex">
 
-			precision mediump float;
-			precision mediump int;
+			varying vec2 vUv;
 
-			uniform mat4 modelViewMatrix; // optional
-			uniform mat4 projectionMatrix; // optional
+			void main() {
 
-			attribute vec3 position;
-			attribute vec4 color;
-
-			varying vec3 vPosition;
-			varying vec4 vColor;
-
-			void main()	{
-
-				vPosition = position;
-				vColor = color;
+				vUv = uv;
 
 				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 
@@ -36,20 +25,14 @@
 
 		<script id="fragmentShader" type="x-shader/x-fragment">
 
-			precision mediump float;
-			precision mediump int;
+			uniform sampler2D baseTexture;
+			uniform sampler2D bloomTexture;
 
-			uniform float time;
+			varying vec2 vUv;
 
-			varying vec3 vPosition;
-			varying vec4 vColor;
-
-			void main()	{
-
-				vec4 color = vec4( vColor );
-				color.r += sin( vPosition.x * 10.0 + time ) * 0.5;
-
-				gl_FragColor = color;
+			void main() {
+				// 				 Original Texture 				Intensity  	 *	Bloom Texture 
+				gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
 
 			}
 
