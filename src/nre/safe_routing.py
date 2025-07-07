@@ -138,6 +138,7 @@ def get_safe_routing_perf_stats(g, entity_risks, return_idv=True):
         min_hop_paths = nx.shortest_path(g, source=src)
         risk_distances = safest_path(g, src, entity_risks, path=min_risk_paths)
         hop_dist = nx.shortest_path_length(g, source=src)
+        hop_dist[src] = 0
 
         np.testing.assert_allclose([hop_dist[node] for node in g.nodes],
                                    [len(min_hop_paths[node]) - 1 for node in g.nodes],
@@ -256,7 +257,7 @@ def compare_topologies_simple_safe_routing(params, df=None, n_size=30, n_iter=25
         g = nx.from_numpy_array(mat_f)
         name_mapping = {i: entity_names[i] for i in range(len(entity_names))}
         g = nx.relabel_nodes(g, name_mapping)
-        entity_risks = {entity_names[i]:risk_mean[i] for i in range(len(entity_names))}
+        entity_risks = {entity_names[i]: risk_mean[i] for i in range(len(entity_names))}
 
         # Simple Safe-Routing Solution
         temp_df = get_safe_routing_perf_stats(g, entity_risks)
@@ -297,7 +298,7 @@ def sample_barabasi_albert_graph(n_size, c, seed=None):
     """ Samples a Barabasi-Albery preferential attachment graph. Number of edges to attach to new node is selected so
      that it matches the expected number of edges in Erdos Renyi graph with critical parameters c"""
     p_er = c * np.log(n_size) / n_size
-    m = int(n_size * p_er)
+    m = int((n_size - 1) * p_er )
     g = nx.barabasi_albert_graph(n_size, m, seed=seed)
 
     # Pick Giant Component
@@ -309,7 +310,7 @@ def sample_watts_strogatz_graph(n_size, c, p_rewire, seed=None):
     """ Samples a Watts Strogatz small world graph. Initial number of edges to attach to a node is selected so
      that it matches the expected number of edges in Erdos Renyi graph with critical parameters c"""
     p_er = c * np.log(n_size) / n_size
-    k = 2 * (int(n_size * p_er) // 2)
+    k = 2 * (int((n_size - 1) * p_er) // 2)  # make it even number
 
     g = nx.watts_strogatz_graph(n_size, k, p_rewire, seed=seed)
 
