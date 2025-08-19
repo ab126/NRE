@@ -7,7 +7,7 @@ from tqdm import tqdm
 import copy
 
 from nre.network_connectivity import ConnectivityUnit, get_mat_f_q_from_covariance
-from ..nre.src.preprocess import preprocess_df
+from nre.preprocess import preprocess_df
 
 
 def generate_random_mvn_model(n_entity=5, n_sample=1000, seed=None):

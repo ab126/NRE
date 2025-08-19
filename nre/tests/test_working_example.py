@@ -9,7 +9,7 @@ from nre.preprocess import preprocess_df
 from nre.real_time_model import NetworkModel
 
 start = time.time()
-df_raw = pd.read_csv('..\\test_flows.csv', header=0, encoding='cp1252')
+df_raw = pd.read_csv('..\\..\\test_flows.csv', header=0, encoding='cp1252')
 df = preprocess_df(df_raw, date_col=' Timestamp')
 
 end = time.time()

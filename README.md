@@ -31,11 +31,11 @@ pip install -r requirements.txt
 
 For beyond correlative entity relationship modelling, it
 also requires [npeet](https://github.com/gregversteeg/NPEET) [2]
-package whose modified version is placed under [src.nre](https://github.com/ab126/NRE/tree/main/src/nre).
+package whose modified version is placed under [nre](https://github.com/ab126/NRE/tree/main/nre) module.
 
 
 ### Working Example
-This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/tests/test_working_example.py).
+This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/nre/tests/test_working_example.py).
 
 First, the connection data is read from a source
 such as ".txt" file, and it is transformed to the desired format. For convenience, [CICFlowMeter](https://www.unb.ca/cic/research/applications.html#CICFlowMeter) [1]
@@ -48,11 +48,11 @@ import time
 
 from matplotlib import pyplot as plt
 
-from nre.src import plot_kalman_res
-from nre.src import preprocess_df
-from nre.src import NetworkModel
+from nre.kalman_network_tools import plot_kalman_res
+from nre.preprocess import preprocess_df
+from nre.real_time_model import NetworkModel
 
-df_raw = pd.read_csv('..\\test_flows.csv', header=0, encoding='cp1252')
+df_raw = pd.read_csv('..\\..\\test_flows.csv', header=0, encoding='cp1252')
 df = preprocess_df(df_raw, date_col=' Timestamp')
 ```
 Next, NetworkModel instance is initialized with initial risk estimates.
