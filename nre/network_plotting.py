@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from networkx.drawing.layout import rescale_layout
 
-from .network_partitioning import apply_spec_clus
+from nre.network_partitioning import apply_spec_clus
 
 
 def draw_spring_layout_with_risks(g, node_clr_arr, seed=345, cmap=None, discrete_color=False, with_labels=False):

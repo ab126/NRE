@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from ..nre.src.network_connectivity import ConnectivityUnit
+from nre.network_connectivity import ConnectivityUnit
 
 
 class TestNetworkModel(unittest.TestCase):

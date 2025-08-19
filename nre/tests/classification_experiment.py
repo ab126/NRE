@@ -3,16 +3,16 @@ import pickle
 
 from matplotlib import pyplot as plt
 
-from ..nre.src.preprocess import preprocess_df
-from ..nre.src.analyze_cic_ids import nre_classification, flow_based_classification
-from ..nre.src.classification_tools import plot_roc_curves
+from nre.preprocess import preprocess_df
+from nre.analyze_cic_ids import nre_classification, flow_based_classification
+from nre.classification_tools import plot_roc_curves
 
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 
-file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Tuesday-WorkingHours.pcap_ISCX.csv'  # 'Monday-WorkingHours.pcap_ISCX.csv' #  Wednesday-workingHours.pcap_ISCX.csv
+file_addr = '..\..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Tuesday-WorkingHours.pcap_ISCX.csv'  # 'Monday-WorkingHours.pcap_ISCX.csv' #  Wednesday-workingHours.pcap_ISCX.csv
 df_cic = pd.read_csv(file_addr, header=0)
 
 df = preprocess_df(df_cic, date_col=' Timestamp')

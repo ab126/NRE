@@ -1,4 +1,5 @@
 import copy
+import scipy.fft
 
 import matplotlib
 import networkx as nx
@@ -7,14 +8,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pingouin as pg
 from filterpy.kalman import KalmanFilter
-
-from .network_partitioning import apply_spec_clus
-from nre.npeet import npeet_entropy_estimators as ee
 from ordered_set import OrderedSet
 
-from .preprocess import preprocess_df
-from .time_windowed import get_window
-import scipy.fft
+from nre.network_partitioning import apply_spec_clus
+from nre.npeet import npeet_entropy_estimators as ee
+from nre.preprocess import preprocess_df
+from nre.time_windowed import get_window
+
 #from pomegranate.bayesian_network import BayesianNetwork # Dont use pomegranate it requires Numpy 2.1!
 
 MIN_SAMPLES = 5  # Minimum number of samples required for connectivity graph calculation

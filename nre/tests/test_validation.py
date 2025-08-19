@@ -1,10 +1,10 @@
 import pandas as pd
 import pickle
 
-from ..nre.src.preprocess import preprocess_df
-from ..nre.src.analyze_cic_ids import nre_classification, flow_based_classification
+from nre.preprocess import preprocess_df
+from nre.analyze_cic_ids import nre_classification, flow_based_classification
 
-from ..nre.src.validation_tools import validate_model
+from nre.validation_tools import validate_model
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Tuesday-WorkingHours.pcap_ISCX.csv'
 df_cic = pd.read_csv(file_addr, header=0, encoding='cp1252')

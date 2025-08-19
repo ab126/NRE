@@ -9,8 +9,8 @@ from PIL import Image
 from filterpy.kalman import KalmanFilter
 from matplotlib import pyplot as plt
 
-from .network_connectivity import MIN_SAMPLES, ConnectivityUnit, get_all_entities, single_risk_update
-from .time_windowed import get_window
+from nre.network_connectivity import MIN_SAMPLES, ConnectivityUnit, get_all_entities, single_risk_update
+from nre.time_windowed import get_window
 
 
 # Kalman Filter Tools

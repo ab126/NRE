@@ -14,8 +14,8 @@ from tqdm import tqdm
 
 from scipy.stats import multivariate_normal as mvn
 
-from nre.src.kalman_network_tools import get_risk_mat_from_df
-from .network_connectivity import get_all_entities
+from nre.kalman_network_tools import get_risk_mat_from_df
+from nre.network_connectivity import get_all_entities
 
 
 def communication_graph_from_df(df, entity_names=None, keep_outsiders=True, src_id_col=' Source IP',

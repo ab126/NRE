@@ -5,16 +5,16 @@ import numpy.random as nr
 
 from matplotlib import pyplot as plt
 
-from ..nre.src.analyze_cic_ids import nre_classification
+from nre.analyze_cic_ids import nre_classification
 
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 
-from ..nre.src.classification_tools import plot_roc_curves
-from ..nre.src.network_connectivity import get_mat_f_q_from_covariance
-from ..nre.src.preprocess import preprocess_df
+from nre.classification_tools import plot_roc_curves
+from nre.network_connectivity import get_mat_f_q_from_covariance
+from nre.preprocess import preprocess_df
 from test_network_model_graph import generate_random_mvn_model, samples2flows
 
 

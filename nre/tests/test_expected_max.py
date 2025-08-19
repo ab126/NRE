@@ -4,7 +4,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from ..nre.src.safe_routing import naive_mc_max, calc_mean_max
+from nre.safe_routing import naive_mc_max, calc_mean_max
 
 seed = 232
 np.random.seed(seed)

@@ -8,7 +8,6 @@ A Python API is offered for real-time operation.
 
 ## Python
 
-### Installation
 NRE has been tested with Python 3.10 and it requires:
 1. numpy
 2. pandas
@@ -24,15 +23,26 @@ NRE has been tested with Python 3.10 and it requires:
 12. pillow
 13. pingouin
 
-These dependencies can be installed via
+For beyond correlative entity relationship modelling, NRE
+also requires [npeet](https://github.com/gregversteeg/NPEET) [2]
+package whose adopted version can be found at [nre/npeet](https://github.com/ab126/NRE/tree/main/nre/npeet).
+
+
+### Manual Installation
+1. Download the repository, extract it into a working directory and setup the virtual environment. 
+
+2. Get the dependencies via
 `
 pip install -r requirements.txt
-`.
+`. 
 
-For beyond correlative entity relationship modelling, it
-also requires [npeet](https://github.com/gregversteeg/NPEET) [2]
-package whose modified version is placed under [nre](https://github.com/ab126/NRE/tree/main/nre) module.
+3. Finally install the package locally:
 
+    ```
+    pip install .
+    ```
+
+_PyPI package coming soon_
 
 ### Working Example
 This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/nre/tests/test_working_example.py).
@@ -69,6 +79,10 @@ nm.update_new_tick_conn_data(df, src_id_col=' Source ID', dst_id_col=' Destinati
                              sync_window_size=20, time_scale='sec', keep_unit=True)
 mat_x, mat_p = nm.mat_x, nm.mat_p
 ```
+
+## License
+
+[MIT](https://choosealicense.com/licenses/mit/)
 
 # References
 1. Arash Habibi Lashkari, Gerard Draper-Gil, Mohammad Saiful Islam Mamun and Ali A. Ghorbani, "Characterization of Tor Traffic Using Time Based Features", In the proceeding of the 3rd International Conference on Information System Security and Privacy, SCITEPRESS, Porto, Portugal, 2017

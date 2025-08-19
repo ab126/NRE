@@ -16,11 +16,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from tqdm import tqdm
 
-from .preprocess import preprocess_df
-from .time_windowed import get_window
-from .network_connectivity import MIN_SAMPLES, cic_conn_param_specs
-from .kalman_network_tools import get_risk_mat_from_df
-from .classification_tools import max_ba_operating_point, get_ba_from_operating_point, infer_roc
+from nre.preprocess import preprocess_df
+from nre.time_windowed import get_window
+from nre.network_connectivity import MIN_SAMPLES, cic_conn_param_specs
+from nre.kalman_network_tools import get_risk_mat_from_df
+from nre.classification_tools import max_ba_operating_point, get_ba_from_operating_point, infer_roc
 
 all_conn_params = ['NPS', 'NPR', 'Packet Length', 'Flow Duration', 'Flow Speed', 'Port Number',  # 'Activation',
                    'Protocol', 'Response Time', 'Packet Delay', 'Header Length', 'NAP', 'Active Time', 'Idle Time']
@@ -396,8 +396,7 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
 # TODO: Both parsers might not be synced
 def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_names_fb=None, sub_net_size=None,
                               conn_params=None, t_graph=100, sync_window_size=1, time_scale='sec', standardize=False,
-                              best_op_point=True,
-                              seed=None, control=False, **kwargs):
+                              best_op_point=True, seed=None, control=False, **kwargs):
     """
     Compares NRE method with common flow-based classifier among different connection parameters
 
