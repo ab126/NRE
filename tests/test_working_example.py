@@ -4,9 +4,9 @@ import time
 
 from matplotlib import pyplot as plt
 
-from src.nre.kalman_network_tools import plot_kalman_res
-from src.nre.preprocess import preprocess_df
-from src.nre.real_time_model import NetworkModel
+from nre.kalman_network_tools import plot_kalman_res
+from nre.preprocess import preprocess_df
+from nre.real_time_model import NetworkModel
 
 start = time.time()
 df_raw = pd.read_csv('..\\test_flows.csv', header=0, encoding='cp1252')

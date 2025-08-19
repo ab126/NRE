@@ -8,7 +8,7 @@ import scipy.fft
 import time
 import datetime
 from pomegranate.bayesian_network import BayesianNetwork
-from src import get_DAG_from_model
+from nre import get_DAG_from_model
 
 MIN_SAMPLES = 5  # Minimum amount of samples required for MI calculation
 

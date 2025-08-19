@@ -1,9 +1,9 @@
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-from src import npeet_entropy_estimators as ee
+from nre import npeet_entropy_estimators as ee
 from ordered_set import OrderedSet
-from src import get_window
+from nre import get_window
 import scipy.fft
 import time
 import datetime

@@ -9,7 +9,7 @@ import pingouin as pg
 from filterpy.kalman import KalmanFilter
 
 from .network_partitioning import apply_spec_clus
-from src.npeet import npeet_entropy_estimators as ee
+from nre.npeet import npeet_entropy_estimators as ee
 from ordered_set import OrderedSet
 
 from .preprocess import preprocess_df

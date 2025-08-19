@@ -40,7 +40,7 @@ let show = false;
 
 // Whether recording mode or not
 const recordMode = true;
-const nreOn = false;
+const nreOn = true;
 
 let bloomComposer, finalComposer, bloomPass, bloomLayer;
 const nodeMaterials = [];

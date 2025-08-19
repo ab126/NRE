@@ -3,10 +3,10 @@ import pickle
 import numpy as np
 import pandas as pd
 
-from ..src.nre.kalman_network_tools import graphs_2_risk_scores
-from ..src.nre.network_connectivity import ConnectivityUnit
-from ..src.nre.signal_plotting import risks_over_time_3d
-from ..src.nre.preprocess import preprocess_df
+from ..nre.src.kalman_network_tools import graphs_2_risk_scores
+from ..nre.src.network_connectivity import ConnectivityUnit
+from ..nre.src.signal_plotting import risks_over_time_3d
+from ..nre.src.preprocess import preprocess_df
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Monday-WorkingHours.pcap_ISCX.csv'
 df_cic = pd.read_csv(file_addr, header=0, encoding='cp1252')

@@ -3,8 +3,8 @@ import pickle
 
 from matplotlib import pyplot as plt
 
-from ..src.nre.preprocess import preprocess_df
-from ..src.nre.analyze_cic_ids import compare_among_conn_params, plot_perf_comparison
+from ..nre.src.preprocess import preprocess_df
+from ..nre.src.analyze_cic_ids import compare_among_conn_params, plot_perf_comparison
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Tuesday-WorkingHours.pcap_ISCX.csv'  # 'Monday-WorkingHours.pcap_ISCX.csv' #  Wednesday-workingHours.pcap_ISCX.csv
 df_cic = pd.read_csv(file_addr, header=0)

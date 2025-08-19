@@ -8,11 +8,11 @@ import time
 import logging
 from websocket_server import WebsocketServer
 
-from src.nre.network_connectivity import get_all_entities
-from src.nre.preprocess import preprocess_df
-from src.nre.real_time_model import NetworkModel
-from src.nre.safe_routing import communication_graph_from_df
-from src.nre.time_windowed import get_window
+from nre.src.network_connectivity import get_all_entities
+from nre.src.preprocess import preprocess_df
+from nre.src.real_time_model import NetworkModel
+from nre.src.safe_routing import communication_graph_from_df
+from nre.src.time_windowed import get_window
 
 
 # Start Server
@@ -184,10 +184,10 @@ def start_stream(ws, df_conn, entity_names, window_type='conn', grow_entities=Fa
 def main():
     """ Start the server and wait for clients"""
     # Read Data
-    with open(r'../../tests/saves/stream_data_84.pickle', 'rb') as file:
+    with open(r'../tests/saves/stream_data_84.pickle', 'rb') as file:
         df = pickle.load(file)
 
-    with open(r'../../tests/saves/victim_net.pickle', 'rb') as handle:
+    with open(r'../tests/saves/victim_net.pickle', 'rb') as handle:
         names = pickle.load(handle)
 
     server = start_web_socket_server()
