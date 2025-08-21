@@ -191,7 +191,7 @@ def _form_xy_ml(flow_data, labels, benign_label='BENIGN', test_size=None, seed=N
 
 def flow_based_classification(df, models, entity_names=None, test_df=None,
                               feat_cols=(' Total Fwd Packets', ' Total Backward Packets'),
-                              benign_label='BENIGN', labelling_opt='attacks first', standardize=False, seed=None,
+                              benign_label='BENIGN', labelling_opt='attacks first', standardize=True, seed=None,
                               test_size=0.33, roc_curves=None, warn=True, **kwargs):
     """
     Binary classification performance of flow-based classifier. Learns decision function on flows and

@@ -53,14 +53,7 @@ format has been opted for ".txt" template for the connection data.
 
 ```python
 import pandas as pd
-import numpy as np
-import time
-
-from matplotlib import pyplot as plt
-
-from nre.kalman_network_tools import plot_kalman_res
 from nre.preprocess import preprocess_df
-from nre.real_time_model import NetworkModel
 
 df_raw = pd.read_csv('..\\..\\test_flows.csv', header=0, encoding='cp1252')
 df = preprocess_df(df_raw, date_col=' Timestamp')
@@ -68,6 +61,8 @@ df = preprocess_df(df_raw, date_col=' Timestamp')
 Next, NetworkModel instance is initialized with initial risk estimates.
 
 ```python
+from nre.real_time_model import NetworkModel
+
 nm = NetworkModel(entity_names=list(np.arange(5)), mat_x_init= np.ones(5), mat_p_init=np.eye(5))
 ```
 Then, the canonical connection data is fed through the model to estimate the risks at the new time tick. See [ConnectivityUnit.read_flows](https://github.com/ab126/NRE/blob/main/src/network_connectivity.py)

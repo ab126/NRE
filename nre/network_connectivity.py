@@ -1,5 +1,6 @@
 import copy
 import scipy.fft
+import warnings
 
 import matplotlib
 import networkx as nx
@@ -15,7 +16,7 @@ from nre.npeet import npeet_entropy_estimators as ee
 from nre.preprocess import preprocess_df
 from nre.time_windowed import get_window
 
-#from pomegranate.bayesian_network import BayesianNetwork # Dont use pomegranate it requires Numpy 2.1!
+# from pomegranate.bayesian_network import BayesianNetwork # Dont use pomegranate it requires Numpy 2.1!
 
 MIN_SAMPLES = 5  # Minimum number of samples required for connectivity graph calculation
 
@@ -28,7 +29,7 @@ cic_conn_param_specs = {
                       'dst_feature_col': ' Bwd Header Length'},
     'Idle Time': {'method': 'average', 'src_feature_col': 'Idle Mean', 'dst_feature_col': 'Idle Mean'},
     'NAP': {'method': 'total', 'src_feature_col': ' act_data_pkt_fwd',
-            'dst_feature_col': ' act_data_pkt_fwd'},
+            'dst_feature_col': ' act_data_pkt_fwd'},  # Number of Active Packets
     'NPS': {'method': 'total', 'src_feature_col': ' Total Fwd Packets',
             'dst_feature_col': ' Total Backward Packets'},  # Number of Packets Sent
     'NPR': {'method': 'total', 'src_feature_col': ' Total Backward Packets',
@@ -36,14 +37,37 @@ cic_conn_param_specs = {
     'Packet Delay': {'method': 'average', 'src_feature_col': ' Fwd IAT Mean', 'dst_feature_col': ' Bwd IAT Mean'},
     'Packet Length': {'method': 'average', 'src_feature_col': ' Fwd Packet Length Mean',
                       'dst_feature_col': ' Bwd Packet Length Mean'},
-    'Port Number': {'method': 'last', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
-    'Protocol': {'method': 'last', 'src_feature_col': ' Protocol', 'dst_feature_col': ' Protocol'},
+    'Port Number': {'method': 'mode', 'src_feature_col': ' Source Port', 'dst_feature_col': ' Destination Port'},
+    'Protocol': {'method': 'mode', 'src_feature_col': ' Protocol', 'dst_feature_col': ' Protocol'},
     'Response Time': {'method': 'average', 'src_feature_col': ' Bwd IAT Mean', 'dst_feature_col': ' Fwd IAT Mean'}
 
 }
 
+ton_iot_conn_param_specs = {
+    'Activation': {'method': 'activation'},
+    'Bytes Sent': {'method': 'total', 'src_feature_col': 'OUT_BYTES',
+                   'dst_feature_col': 'IN_BYTES'},
+    'Bytes Received': {'method': 'total', 'src_feature_col': 'IN_BYTES',
+                       'dst_feature_col': 'OUT_BYTES'},
+    'Flow Duration': {'method': 'total', 'src_feature_col': 'FLOW_DURATION_MILLISECONDS',
+                      'dst_feature_col': 'FLOW_DURATION_MILLISECONDS'},
+    'NPS': {'method': 'total', 'src_feature_col': 'OUT_PKTS',
+            'dst_feature_col': 'IN_PKTS'},  # Number of Packets Sent
+    'NPR': {'method': 'total', 'src_feature_col': 'IN_PKTS',
+            'dst_feature_col': 'OUT_PKTS'},  # Number of Packets Received
+    'Port Number': {'method': 'mode', 'src_feature_col': 'L4_SRC_PORT', 'dst_feature_col': 'L4_DST_PORT'},
+    'Protocol': {'method': 'mode', 'src_feature_col': 'PROTOCOL', 'dst_feature_col': 'PROTOCOL'},
+    'Throughput': {'method': 'average', 'src_feature_col': 'SRC_TO_DST_AVG_THROUGHPUT',
+                   'dst_feature_col': 'DST_TO_SRC_AVG_THROUGHPUT'},
+    'Retransmitted Packets': {'method': 'total', 'src_feature_col': 'RETRANSMITTED_IN_PKTS',
+                              'dst_feature_col': 'RETRANSMITTED_OUT_PKTS'},  # Features sheets claims this
+                                                                             # is src -> dst (!)
+    'Response Time': {'method': 'average', 'src_feature_col': 'DST_TO_SRC_IAT_AVG',
+                      'dst_feature_col': 'SRC_TO_DST_IAT_AVG'}
+}
 
-# TODO: Implement Inheritance
+
+# TODO: Implement Inheritance for hierarchical organization of networks
 class ConnectivityUnit:
     """
     Base unit for analyzing entity connectivity/relationships in subnetworks.
@@ -80,7 +104,7 @@ class ConnectivityUnit:
 
     def read_flows(self, df, entity_names=None, window_type='time', date_col=' Timestamp', last_datetime=None,
                    sync_window_size=1.2, time_scale='sec', conn_size=50, src_id_col=' Source IP',
-                   dst_id_col=' Destination IP', conn_param=None, src_feature_col=' Total Fwd Packets',
+                   dst_id_col=' Destination IP', conn_param='NPS', src_feature_col=' Total Fwd Packets',
                    dst_feature_col=' Total Backward Packets', method='total'):
         """
         Read flows from the DataFrame, computes the samples for the respective connection parameter
@@ -131,15 +155,17 @@ class ConnectivityUnit:
 
                 temp = [0 for _ in sub_net_names]
                 counts = np.zeros(len(sub_net_names))
+                feature_freq = [{} for _ in sub_net_names]
                 for row in window.to_dict('records'):  # Faster loop through rows
                     s_ind, d_ind = _get_s_d_ind(row, sub_net_names, node_ind_dict, idle_name=idle_name,
                                                 src_id_col=src_id_col, dst_id_col=dst_id_col)
 
                     if conn_param is None:
-                        _update_sample(temp, row, counts, s_ind, d_ind, src_feature_col, dst_feature_col, method=method)
+                        _update_sample(temp, row, counts, s_ind, d_ind, src_feature_col, dst_feature_col,
+                                       feature_freq=feature_freq, method=method)
                     else:
                         kwargs = self.conn_param_specs[conn_param]
-                        _update_sample(temp, row, counts, s_ind, d_ind, **kwargs)
+                        _update_sample(temp, row, counts, s_ind, d_ind, feature_freq=feature_freq, **kwargs)
 
                     # Total Samples Count
                     num_appearances[s_ind] += 1
@@ -256,8 +282,11 @@ class ConnectivityUnit:
         :return : None
         """
 
-        assert self.samples.shape[0] >= MIN_SAMPLES, "Number of Samples ({}) must be at least {}!".format(
-            self.samples.shape[0], MIN_SAMPLES)
+        if self.samples.shape[0] <= MIN_SAMPLES:
+            warnings.warn("Number of Samples ({}) is less than minimum required {}. No connectivity assigned for " +
+                          "that window".format(self.samples.shape[0], MIN_SAMPLES))
+            self.mat_f = np.eye(len(self.names))
+            return
 
         if method == 'mi':
             mat_f = np.zeros((len(self.names), len(self.names)))
@@ -329,8 +358,9 @@ class ConnectivityUnit:
             assert control_dict is not None, "No control set samples provided"
             for cont_name, cont_samples in control_dict.items():
                 assert len(cont_samples) == self.samples.shape[
-                    0], "Number of samples in control set does not match target samples {},{}".format(len(cont_samples), self.samples.shape[
-                    0])
+                    0], "Number of samples in control set does not match target samples {},{}".format(len(cont_samples),
+                                                                                                      self.samples.shape[
+                                                                                                          0])
                 self.control_names.append(cont_name)
 
             # Form data df
@@ -564,14 +594,14 @@ def _get_s_d_ind(flow_row, sub_net_names, node_ind_dict, idle_name='Unused', src
     return s_ind, d_ind
 
 
-def _update_sample(window_sample, flow_row, counts, s_ind, d_ind, src_feature_col=None, dst_feature_col=None,
-                   method='average'):
+def _update_sample(window_sample, flow_row, flow_counts, s_ind, d_ind, feature_freq=None,
+                   src_feature_col=None, dst_feature_col=None, method='average'):
     """
     Updates the window sample for a synchronization window with the given indices of the new observation
     ---------------
     :param window_sample: Samples of entities for the synchronization window
     :param flow_row: DataFrame or dictionary corresponding to the flow
-    :param counts: Total count dictionary of flows for each entity
+    :param flow_counts: Total count dictionary of flows for each entity
     :param s_ind: Index in window_sample corresponding to the source entity
     :param d_ind: Index in window_sample corresponding to the destination entity
     :param src_feature_col: Column name of the flows data DatatFrame that indicates source entity flow feature.
@@ -580,28 +610,49 @@ def _update_sample(window_sample, flow_row, counts, s_ind, d_ind, src_feature_co
                    'activation'].
             'average': Average over flows of entities
             'total': Sum over flows of entities
-            'last': Last flow of entities
+            'last': Last appearance for the flows of entities
+            'mode': The most frequent appearance over flows of entities (need to provide previous frequencies)
             'activation': Binary values for entities indicating if an entity was active during the time window (1)
                           or not (0).
     :return: None
     """
     if src_feature_col is None or dst_feature_col is None:
         assert method == 'activation', "'src_feature_col' or 'dst_feature_col' is not provided."
+    if method == 'mode':
+        assert feature_freq is not None, "Feature value frequencies must be provided for {} aggregation method".format(
+            method)
 
     if method == 'average':
-        window_sample[s_ind] = (window_sample[s_ind] * counts[s_ind] + float(flow_row[src_feature_col])) / (
-                counts[s_ind] + 1)
-        window_sample[d_ind] = (window_sample[d_ind] * counts[d_ind] + float(flow_row[dst_feature_col])) / (
-                counts[d_ind] + 1)
+        window_sample[s_ind] = (window_sample[s_ind] * flow_counts[s_ind] + float(flow_row[src_feature_col])) / (
+                flow_counts[s_ind] + 1)
+        window_sample[d_ind] = (window_sample[d_ind] * flow_counts[d_ind] + float(flow_row[dst_feature_col])) / (
+                flow_counts[d_ind] + 1)
         # Number of instances in a window
-        counts[s_ind] += 1
-        counts[d_ind] += 1
+        flow_counts[s_ind] += 1
+        flow_counts[d_ind] += 1
     elif method == 'total':
         window_sample[s_ind] += float(flow_row[src_feature_col])
         window_sample[d_ind] += float(flow_row[dst_feature_col])
     elif method == 'last':
         window_sample[s_ind] = flow_row[src_feature_col]
         window_sample[d_ind] = flow_row[dst_feature_col]
+    elif method == 'mode':
+        src_val = flow_row[src_feature_col]
+        dst_val = flow_row[dst_feature_col]
+
+        if src_val not in feature_freq[s_ind]:
+            feature_freq[s_ind][src_val] = 0
+        if dst_val not in feature_freq[d_ind]:
+            feature_freq[d_ind][dst_val] = 0
+
+        feature_freq[s_ind][src_val] += 1
+        feature_freq[d_ind][dst_val] += 1
+
+        src_mode_val = max(feature_freq[s_ind], key=feature_freq[s_ind].get)
+        dst_mode_val = max(feature_freq[d_ind], key=feature_freq[d_ind].get)
+
+        window_sample[s_ind] = src_mode_val
+        window_sample[d_ind] = dst_mode_val
     elif method == 'activation':
         window_sample[s_ind] = 1
         window_sample[d_ind] = 1
