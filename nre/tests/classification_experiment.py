@@ -4,7 +4,7 @@ import pickle
 from matplotlib import pyplot as plt
 
 from nre.preprocess import preprocess_df
-from nre.analyze_cic_ids import nre_classification, flow_based_classification
+from nre.analyze_nf_dataset import nre_classification, flow_based_classification
 from nre.classification_tools import plot_roc_curves
 
 from sklearn.svm import LinearSVC

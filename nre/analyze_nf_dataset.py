@@ -50,8 +50,9 @@ def split_df(df, ):
 
 
 def flow_data_parser(df, entity_names=None, sub_net_size=None, feat_cols=(' Total Fwd Packets',), date_col=' Timestamp',
-                     t_graph=100, time_scale='sec', label_col=' Label', labelling_opt='attacks first',
-                     benign_label='BENIGN', src_id_col=' Source IP', dst_id_col=' Destination IP', seed=None):
+                     window_type='time', t_graph=100, time_scale='sec', n_graph=5_000, label_col=' Label',
+                     labelling_opt='attacks first', benign_label='BENIGN', src_id_col=' Source IP',
+                     dst_id_col=' Destination IP', seed=None, skip_idle=True, **kwargs):
     """
     Parses the connection data into a data matrix using time windows.
 
@@ -60,8 +61,10 @@ def flow_data_parser(df, entity_names=None, sub_net_size=None, feat_cols=(' Tota
     :param sub_net_size: Percentage of the size of the total dataset is confined to. Overrides entity_names
     :param feat_cols: Column names of the source dataframe that is considered
     :param date_col: The dataframe df column that holds datetime timestamps of flows
+    :param window_type: The windowing type, either 'time' or 'conn'/'connection'.
     :param t_graph: Time window length that corresponds to a single state graph in time_scale units
     :param time_scale: Time window units. Either 'sec' or 'min'
+    :param n_graph: Number connections used to form a single network state graph (only if window_type=='connection')
     :param label_col: The dataframe df column that holds the labels of flows
     :param labelling_opt: Labelling scheme to be used; either 'attacks first' or 'majority'. 'attacks first' labels the
         windows that have a flow anything other than BENIGN as 'attack'. 'majority' option casts a majority vote
@@ -70,6 +73,8 @@ def flow_data_parser(df, entity_names=None, sub_net_size=None, feat_cols=(' Tota
     :param src_id_col: Column name of the flows data DatatFrame that identifies the source entity.
     :param dst_id_col: Column name of the flows data DatatFrame that identifies the destination entity.
     :param seed: If int, uses this seed for sub-sampling the entities if applicable
+    :param skip_idle: If True, skips over empty windows; if False, results in identity graphs in between
+    :param kwargs: Dummy parameter for equivalance with NRE method
 
     :return: flow_data, labels, label_counts, flow_labels
         flow_data: The list of features of windowed flows in the same window
@@ -109,15 +114,24 @@ def flow_data_parser(df, entity_names=None, sub_net_size=None, feat_cols=(' Tota
     labels = []
     label_counts = []
 
+    i = 0
     end_of_df = False
     current_datetime = df.iloc[0][date_col]
     last_datetime = df.iloc[-1][date_col]
     while end_of_df is False:
         temp_data = []
-        temp_df, _, current_datetime = get_window(current_datetime, df, time_window=t_graph, date_col=date_col,
-                                                  time_scale=time_scale, return_next_time=True)
-        if current_datetime >= last_datetime:
-            end_of_df = True
+
+        if window_type == 'connection' or window_type == 'conn':
+            temp_df = df.iloc[i * n_graph: (i + 1) * n_graph, :].copy()
+            i += 1
+            if i >= df.shape[0] // n_graph:
+                end_of_df = True
+        else:  # Time
+            temp_df, _, current_datetime = get_window(current_datetime, df, time_window=t_graph, date_col=date_col,
+                                                      time_scale=time_scale, return_next_time=skip_idle)
+            if current_datetime >= last_datetime:
+                end_of_df = True
+
         if temp_df.empty or len(temp_df.shape) < 2 or temp_df.shape[0] < MIN_SAMPLES:
             flow_data.append(temp_data)
             labels.append('Empty')
@@ -227,6 +241,8 @@ def flow_based_classification(df, models, entity_names=None, test_df=None,
     flow_data, labels, label_counts = flow_data_parser(df, entity_names=entity_names, feat_cols=feat_cols,
                                                        benign_label=benign_label, labelling_opt=labelling_opt,
                                                        seed=seed, **kwargs)
+    # print(labels)
+
 
     if test_df is not None:
         flow_data_test, labels_test, label_counts_test = flow_data_parser(test_df, entity_names=entity_names,
@@ -335,6 +351,7 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
 
    """
     risk_mat, labels, _, _, _ = get_risk_mat_from_df(df, benign_label=benign_label, **kwargs)
+    # print(labels)
     ind = np.array(labels) != 'Empty'
 
     if test_df is not None:
@@ -350,9 +367,12 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
         mat_x = risk_mat[ind, :]
         y = np.array(labels)[ind]
         y_bin = np.array([-1 if val == benign_label else 1 for val in y])
+        # print('Here', y_bin)
         rand_state = seed if seed else np.random.randint(0, 10 ** 5)
         mat_x_train, mat_x_test, y_train, y_test = train_test_split(mat_x, y_bin, test_size=test_size,
                                                                     random_state=rand_state, stratify=y_bin)
+
+    print(np.unique(y_train))
 
     if standardize:
         ss_train = StandardScaler()
@@ -361,6 +381,9 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
         # ss_test = StandardScaler()
         mat_x_test = ss_train.transform(mat_x_test)
 
+    # print(np.unique(y_train, return_counts=True))
+    if len(np.unique(y_train)) == 1:
+        raise AssertionError("For the parameter set given, there is only single class of network state. \n {}".format(kwargs))
     accuracy, precision, recall, b_acc, f1, auc_score = {}, {}, {}, {}, {}, {}
     for mdl in models.keys():
         # Fit the classifier

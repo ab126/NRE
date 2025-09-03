@@ -5,7 +5,7 @@ import numpy.random as nr
 
 from matplotlib import pyplot as plt
 
-from nre.analyze_cic_ids import nre_classification
+from nre.analyze_nf_dataset import nre_classification
 
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier

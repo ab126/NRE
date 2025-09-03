@@ -1,3 +1,5 @@
+import warnings
+
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -14,7 +16,11 @@ def validate_model(df_train, df_val, model, param_list):
     auc_scores = []
     for params in tqdm(param_list):
         roc_curves = {}
-        _ = model(df_train, ml_models, test_df=df_val, roc_curves=roc_curves, **params)
+        try:
+            _ = model(df_train, ml_models, test_df=df_val, roc_curves=roc_curves, **params)
+        except AssertionError as e:
+            warnings.warn("Assertion Error: \n{}".format(e))
+            continue
 
         max_auc = 0
         for mdl in ml_models:

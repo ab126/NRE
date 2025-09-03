@@ -76,13 +76,13 @@ class ConnectivityUnit:
 
     # TODO: Make it serializable by adding __dict__ method
 
-    def __init__(self, loss_thr=9999, mat_x_init=None, mat_p_init=None, mat_q=None):
+    def __init__(self, loss_thr=9999, conn_param_specs=None, mat_x_init=None, mat_p_init=None, mat_q=None):
 
         self.g = nx.empty_graph()
         self.conn_params = ['Activation', 'Num Packets Sent', 'Num Packets Rec', 'Packet Length',
                             'Flow Duration', 'Flow Speed', 'Response Time', 'Packet Delay', 'Header Length',
                             'Num Active Packets', 'Active Time', 'Idle Time']
-        self.conn_param_specs = cic_conn_param_specs
+        self.conn_param_specs = conn_param_specs if conn_param_specs is not None else cic_conn_param_specs
         self.samples = np.empty((0, 2))
         self.control_samples = np.empty((0, 2))
         self.names = []
@@ -174,7 +174,7 @@ class ConnectivityUnit:
                 temp.pop()  # Remove unused entry
                 samples.append(temp)
 
-        else:  # 'connection' 
+        else:  # 'conn' or 'connection'
             n = 0
             temp = [0 for _ in sub_net_names]
             counts = np.zeros(len(sub_net_names))
@@ -521,7 +521,7 @@ class ConnectivityUnit:
             # Form new units
             ind = np.array([i for i in range(len(self.names)) if self.names[i] in sub_names])
 
-            sub_cu = ConnectivityUnit()
+            sub_cu = ConnectivityUnit(conn_param_specs=self.conn_param_specs)
             sub_cu.samples = self.samples[ind].copy()
             sub_cu.names = list(np.array(self.names)[ind])
             sub_cu.num_appearances = self.num_appearances[ind].copy()

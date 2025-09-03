@@ -11,7 +11,7 @@ from sklearn.naive_bayes import GaussianNB
 
 from nre.classification_tools import plot_roc_curves
 from nre.preprocess import preprocess_df
-from nre.analyze_cic_ids import flow_based_classification
+from nre.analyze_nf_dataset import flow_based_classification
 
 
 def generate_n_flow_modes(n, n_flow=10000, flow_feat_mean_high=10, flow_feat_var=1, noise_std=5,

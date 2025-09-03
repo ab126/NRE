@@ -2,7 +2,7 @@ import pandas as pd
 import pickle
 
 from nre.preprocess import preprocess_df
-from nre.analyze_cic_ids import nre_classification, flow_based_classification
+from nre.analyze_nf_dataset import nre_classification, flow_based_classification
 
 from nre.validation_tools import validate_model
 

@@ -168,7 +168,7 @@ def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, mat_
     return out_vars
 
 
-# TODO: Needs to be renewed
+# TODO: Needs to be revised
 def score_evaluation(df, entity_names, w, conn_param='Num Packets Rec', batch_size=100, time_windows=None,
                      time_scale='sec', window_types=None, domain_types=None, methods=None):
     """
@@ -251,10 +251,11 @@ def score_evaluation(df, entity_names, w, conn_param='Num Packets Rec', batch_si
 
 
 # NRE Classification Tools
-def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='time', t_graph=180, date_col=' Timestamp',
-                            label_col=' Label', src_id_col=' Source IP', dst_id_col=' Destination IP',
-                            time_scale='sec', n_graph=10000, labelling_opt='attacks first', benign_label='BENIGN',
-                            skip_idle=True, verbose=True, return_datetimes=False, timeit=False, **kwargs):
+def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='time', t_graph=180, time_scale='sec',
+                            n_graph=5000, date_col=' Timestamp', label_col=' Label', src_id_col=' Source IP',
+                            dst_id_col=' Destination IP', labelling_opt='attacks first', benign_label='BENIGN',
+                            conn_param_specs=None, skip_idle=True, verbose=True, return_datetimes=False, timeit=False,
+                            **kwargs):
     """
     Parses the df into state graphs on entity_names using connection or time windows.
 
@@ -262,18 +263,19 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
         Each row is a flow
     :param entity_names: List of entities that the flows are constrained to
     :param method: ConnectivityUnit method for fitting the graph model to samples
-    :param window_type: The windowing type, either 'time' or 'connection'.
+    :param window_type: The windowing type, either 'time' or 'conn'/'connection'.
     :param t_graph: Time window length that corresponds to a single state graph in time_scale units
+    :param n_graph: Number connections used to form a single network state graph (only if window_type=='connection')
     :param date_col: The dataframe df column that holds datetime timestamps of flows
     :param label_col: The dataframe df column that holds the labels of flows
     :param src_id_col: Column name of the flows data DatatFrame that identifies the source entity.
     :param dst_id_col: Column name of the flows data DatatFrame that identifies the destination entity.
     :param time_scale: Time window units. Either 'sec' or 'min'
-    :param n_graph: Number connections used to form a single network state graph (only if window_type=='connection')
     :param labelling_opt: Labelling scheme to be used; either 'attacks first' or 'majority'. 'attacks first' labels the
         windows that have a flow anything other than BENIGN as 'attack'. 'majority' option casts a majority vote
         among flows in the window to produce the label
     :param benign_label: Label of the benign, non-malicious, flows
+    :param conn_param_specs: Connection Parameter Specifications for the ConnectivityUnit instance
     :param skip_idle: If True, skips over empty windows; if False, results in identity graphs in between
     :param verbose: If True, print the graph number, datetime currently at in df and sample size used to calculate graph
         as running
@@ -305,18 +307,14 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
 
     date_times = [current_datetime]
     while end_of_df is False:
-        if window_type == 'connection':
+        if window_type == 'connection' or window_type == 'conn':
             temp_df = df.iloc[i * n_graph: (i + 1) * n_graph, :].copy()
             i += 1
             if i >= df.shape[0] // n_graph:
                 end_of_df = True
         else:  # 'time'
-            if skip_idle:
-                temp_df, _, current_datetime = get_window(current_datetime, df, date_col=date_col, time_window=t_graph,
-                                                          time_scale=time_scale, return_next_time=True)
-            else:
-                temp_df, current_datetime = get_window(current_datetime, df, date_col=date_col, time_window=t_graph,
-                                                       time_scale=time_scale)
+            temp_df, _, current_datetime = get_window(current_datetime, df, date_col=date_col, time_window=t_graph,
+                                                      time_scale=time_scale, return_next_time=skip_idle)
             date_times.append(current_datetime)
             if current_datetime >= last_datetime:
                 end_of_df = True
@@ -331,12 +329,12 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
             i += 1
             print(i) if verbose else None
 
-        cu = ConnectivityUnit()
+        cu = ConnectivityUnit(conn_param_specs=conn_param_specs)
         delta_datetime = datetime.timedelta(minutes=t_graph) if time_scale == 'min' else datetime.timedelta(
             seconds=t_graph)
         window_last_datetime = temp_df[date_col].iloc[0] + delta_datetime
         cu.read_flows(temp_df, entity_names=entity_names, last_datetime=window_last_datetime, window_type=window_type,
-                      date_col=date_col, time_scale=time_scale, **kwargs)
+                      date_col=date_col, time_scale=time_scale, src_id_col=src_id_col, dst_id_col=dst_id_col, **kwargs)
         if verbose:
             print('Current time and samples shape: ', current_datetime, cu.samples.shape)
         cu.fit_connectivity_model(method=method, verbose=False)  # cov
@@ -365,7 +363,8 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
                 labels.append(str(list(temp_counts.keys())[ind]))
         else:  # Majority labelling
             ind = np.argmax(list(temp_counts.values()))
-            labels.append(str(list(temp_counts.keys())[ind]))
+            lbl = str(list(temp_counts.keys())[ind])
+            labels.append(lbl)
 
         # Running times
         if timeit:
@@ -407,8 +406,7 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.2, re
         t_sim: (Returned only if timeit==True) List of running time spent for calculating each graph
     """
 
-    out_vars = parse_df_2_state_graphs(df, window_type='time', return_datetimes=return_datetimes,
-                                       timeit=timeit, **kwargs)
+    out_vars = parse_df_2_state_graphs(df, return_datetimes=return_datetimes, timeit=timeit, **kwargs)
     out_vars = list(out_vars)
 
     all_graphs, labels, label_counts, entity_names = out_vars[:4]  # First 4 are always same
@@ -422,7 +420,7 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.2, re
     all_graphs = graph_evol(all_graphs, forget_factor)
     out_risk = graphs_2_risk_scores(all_graphs, k_steps=k_steps, relief_factor=relief_factor, normalize=True,
                                     sequential=True, whole_risks=True, return_cov=return_cov)
-    labels.insert(0, 'Empty')
+    labels.insert(0, 'Empty')  # TODO: Check necessity of this step
     label_counts.insert(0, {})
     if return_cov:
         all_risks, all_cov = out_risk
