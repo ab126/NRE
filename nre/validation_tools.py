@@ -8,7 +8,7 @@ from sklearn.metrics import auc
 from tqdm import tqdm
 
 
-def validate_model(df_train, df_val, model, param_list):
+def validate_method(df_train, df_val, model, param_list):
     """Calculates the validation performance for the set of parameters for NRE or Flow-based alternative"""
     ml_models = {'Linear Support Vector Machines': LinearSVC(dual='auto'), 'Decision Tree': DecisionTreeClassifier(),
                  'Random Forest': RandomForestClassifier(), 'Naive Bayes': GaussianNB()}

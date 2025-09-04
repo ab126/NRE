@@ -4,7 +4,7 @@ import pickle
 from nre.preprocess import preprocess_df
 from nre.analyze_nf_dataset import nre_classification, flow_based_classification
 
-from nre.validation_tools import validate_model
+from nre.validation_tools import validate_method
 
 file_addr = '..\CIC-IDS-2017\GeneratedLabelledFlows\TrafficLabelling\Tuesday-WorkingHours.pcap_ISCX.csv'
 df_cic = pd.read_csv(file_addr, header=0, encoding='cp1252')
@@ -36,4 +36,4 @@ df_val = df.iloc[n_train:n_train + n_val, :]
 df_test = df.iloc[n_train + n_val:, :]
 
 param_list = [{'t_graph': 90, 'sync_window_size': 1.2, 'forget_factor': 0.5, 'relief_factor': 0.6, 'k_steps': 1}]
-auc_scores_nre = validate_model(df_train, df_val, model_nre, param_list)
+auc_scores_nre = validate_method(df_train, df_val, model_nre, param_list)

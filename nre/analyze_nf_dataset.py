@@ -18,12 +18,12 @@ from tqdm import tqdm
 
 from nre.preprocess import preprocess_df
 from nre.time_windowed import get_window
-from nre.network_connectivity import MIN_SAMPLES, cic_conn_param_specs
+from nre.network_connectivity import MIN_SAMPLES, cic_conn_param_specs, ton_iot_conn_param_specs
 from nre.kalman_network_tools import get_risk_mat_from_df
 from nre.classification_tools import max_ba_operating_point, get_ba_from_operating_point, infer_roc
 
-all_conn_params = ['NPS', 'NPR', 'Packet Length', 'Flow Duration', 'Flow Speed', 'Port Number',  # 'Activation',
-                   'Protocol', 'Response Time', 'Packet Delay', 'Header Length', 'NAP', 'Active Time', 'Idle Time']
+#all_conn_params = ['NPS', 'NPR', 'Packet Length', 'Flow Duration', 'Flow Speed', 'Port Number',  # 'Activation',
+#                   'Protocol', 'Response Time', 'Packet Delay', 'Header Length', 'NAP', 'Active Time', 'Idle Time']
 conn_param_name_dict = {'NPS': 'Number of Packets Sent', 'NPR': 'Number of Packets Received',
                         'NAP': 'Number of Active Packets'}  # Name dictionary
 
@@ -372,7 +372,7 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
         mat_x_train, mat_x_test, y_train, y_test = train_test_split(mat_x, y_bin, test_size=test_size,
                                                                     random_state=rand_state, stratify=y_bin)
 
-    print(np.unique(y_train))
+    # print(np.unique(y_train))
 
     if standardize:
         ss_train = StandardScaler()
@@ -418,8 +418,8 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
 
 # TODO: Both parsers might not be synced
 def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_names_fb=None, sub_net_size=None,
-                              conn_params=None, t_graph=100, sync_window_size=1, time_scale='sec', standardize=False,
-                              best_op_point=True, seed=None, control=False, **kwargs):
+                              conn_params=None, conn_param_specs=None, standardize=False, best_op_point=True,
+                              seed=None, control=False, **kwargs):
     """
     Compares NRE method with common flow-based classifier among different connection parameters
 
@@ -431,9 +431,7 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
         entity_names_nre is used instead
     :param sub_net_size: Percentage of the size of the total dataset is confined to for fb method. Overrides entity_names
     :param conn_params: Predefined connection parameter that the samples are calculated for.
-    :param t_graph: Time window length that corresponds to a single state graph in time_scale units
-    :param sync_window_size: Time window size for synchronizing flows.
-    :param time_scale: Time window units. Either 'sec' or 'min'
+    :param conn_param_specs: Connection Parameter Specifications, see network_connectivity
     :param standardize: If True, Standardizes risk estimate and flow features data
     :param best_op_point: If True, picks the operating point with the highest balanced accuracy and only audits balanced
         accuracy metric
@@ -442,27 +440,29 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
     :param kwargs: nre_classification kwargs
     :return all_df: Classification results as a DataFrame object
     """
+
     if models is None:
         models = {'Decision Trees': DecisionTreeClassifier(),
                   # 'Linear Support Vector Machines': LinearSVC(dual='auto')
                   'Random Forest': RandomForestClassifier(), 'Naive Bayes': GaussianNB()}
+    if conn_param_specs is None:
+        conn_param_specs = cic_conn_param_specs
+    all_conn_params = list(conn_param_specs.keys())
     if conn_params is None:
         conn_params = copy.copy(all_conn_params)
 
     all_df = pd.DataFrame()
     if control:
         # Create Feature Columns for all connection parameters
-        feat_cols_all = [cic_conn_param_specs[conn_param]['src_feature_col'] for conn_param in all_conn_params]
-        [feat_cols_all.append(cic_conn_param_specs[conn_param]['dst_feature_col']) for conn_param in all_conn_params]
+        feat_cols_all = [conn_param_specs[conn_param]['src_feature_col'] for conn_param in all_conn_params if conn_param != 'Activation' ]
+        [feat_cols_all.append(conn_param_specs[conn_param]['dst_feature_col']) for conn_param in all_conn_params if conn_param != 'Activation']
         feat_cols_all = list(np.unique(feat_cols_all))
         print('All features: ', feat_cols_all)
 
         flow_based_curves_control = {}
-        df_flow_control = flow_based_classification(df, models, entity_names=None,
-                                                    feat_cols=feat_cols_all, t_graph=t_graph,
-                                                    roc_curves=flow_based_curves_control,
-                                                    time_scale=time_scale, standardize=standardize, seed=seed,
-                                                    warn=not best_op_point)
+        df_flow_control = flow_based_classification(df, models, entity_names=None, feat_cols=feat_cols_all,
+                                                    roc_curves=flow_based_curves_control, standardize=standardize,
+                                                    seed=seed, warn=not best_op_point, **kwargs)
         if best_op_point:
             df_flow_control = df_flow_control.loc[:, ['Balanced Accuracy']]
             for key in flow_based_curves_control:
@@ -478,9 +478,9 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
 
     for conn_param in tqdm(conn_params):
         nre_curves = {}
-        df_nre = nre_classification(df, models, conn_param=conn_param, entity_names=entity_names_nre, t_graph=t_graph,
-                                    verbose=False, sync_window_size=sync_window_size, roc_curves=nre_curves,
-                                    time_scale=time_scale, standardize=standardize, seed=seed, **kwargs)
+        df_nre = nre_classification(df, models, entity_names=entity_names_nre, conn_param=conn_param,
+                                    conn_param_specs=conn_param_specs, verbose=False, roc_curves=nre_curves,
+                                    standardize=standardize, seed=seed, **kwargs)
         if best_op_point:
             df_nre = df_nre.loc[:, ['Balanced Accuracy']]
             for key in nre_curves:
@@ -496,14 +496,16 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
         df_nre.index = np.arange(df_nre.shape[0])
         df_nre['Method'] = ['NRE' for _ in range(df_nre.shape[0])]
 
-        feat_cols = list(
-            {cic_conn_param_specs[conn_param]['src_feature_col'], cic_conn_param_specs[conn_param]['dst_feature_col']})
+        src_feat_col = conn_param_specs[conn_param]['src_feature_col'] if conn_param != 'Activation' else\
+            conn_param_specs['NPS']['src_feature_col']
+        dst_feat_col = conn_param_specs[conn_param]['dst_feature_col'] if conn_param != 'Activation' else \
+            conn_param_specs['NPS']['dst_feature_col']
+        feat_cols = list({src_feat_col, dst_feat_col})
 
         flow_based_curves = {}
         df_flow = flow_based_classification(df, models, entity_names=entity_names_fb,
-                                            feat_cols=feat_cols, t_graph=t_graph, roc_curves=flow_based_curves,
-                                            time_scale=time_scale, standardize=standardize, seed=seed,
-                                            warn=not best_op_point, sub_net_size=sub_net_size)
+                                            feat_cols=feat_cols, roc_curves=flow_based_curves, standardize=standardize,
+                                            seed=seed, warn=not best_op_point, sub_net_size=sub_net_size, **kwargs)
         if best_op_point:
             df_flow = df_flow.loc[:, ['Balanced Accuracy']]
             for key in flow_based_curves:
