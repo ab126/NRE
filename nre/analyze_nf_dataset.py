@@ -22,13 +22,10 @@ from nre.network_connectivity import MIN_SAMPLES, cic_conn_param_specs, ton_iot_
 from nre.kalman_network_tools import get_risk_mat_from_df
 from nre.classification_tools import max_ba_operating_point, get_ba_from_operating_point, infer_roc
 
-#all_conn_params = ['NPS', 'NPR', 'Packet Length', 'Flow Duration', 'Flow Speed', 'Port Number',  # 'Activation',
-#                   'Protocol', 'Response Time', 'Packet Delay', 'Header Length', 'NAP', 'Active Time', 'Idle Time']
+
 conn_param_name_dict = {'NPS': 'Number of Packets Sent', 'NPR': 'Number of Packets Received',
                         'NAP': 'Number of Active Packets'}  # Name dictionary
 
-
-# all_conn_params = list(cic_conn_param_specs.keys())
 
 def read_cic_flow_meter_csv(file_addr):
     """
@@ -203,7 +200,7 @@ def _form_xy_ml(flow_data, labels, benign_label='BENIGN', test_size=None, seed=N
         return x_flow_train, y_flow_train, n_flow_train, x_flow_test, y_win_test, n_flow_test
 
 
-def flow_based_classification(df, models, entity_names=None, test_df=None,
+def flow_based_classification(df, models, df_test=None, entity_names=None,
                               feat_cols=(' Total Fwd Packets', ' Total Backward Packets'),
                               benign_label='BENIGN', labelling_opt='attacks first', standardize=True, seed=None,
                               test_size=0.33, roc_curves=None, warn=True, **kwargs):
@@ -215,7 +212,7 @@ def flow_based_classification(df, models, entity_names=None, test_df=None,
     :param df: Canonical source dataframe that has flow information with timestamp, label and flow features. Each row is a flow
     :param models: model dictionary (name:classifier) to use in state identification
     :param entity_names: List of entities that the flows are constrained to
-    :param test_df: Test data in Canonical dataframe format
+    :param df_test: Test data in Canonical dataframe format
     :param feat_cols: Column names of the source dataframe that is considered
     :param benign_label: Label of the benign, non-malicious, flows
     :param labelling_opt: Labeling scheme to be used; either 'attacks first' or 'majority'. 'attacks first' labels the
@@ -244,8 +241,8 @@ def flow_based_classification(df, models, entity_names=None, test_df=None,
     # print(labels)
 
 
-    if test_df is not None:
-        flow_data_test, labels_test, label_counts_test = flow_data_parser(test_df, entity_names=entity_names,
+    if df_test is not None:
+        flow_data_test, labels_test, label_counts_test = flow_data_parser(df_test, entity_names=entity_names,
                                                                           feat_cols=feat_cols,
                                                                           benign_label=benign_label, seed=seed,
                                                                           labelling_opt=labelling_opt, **kwargs)
@@ -331,7 +328,7 @@ def flow_based_classification(df, models, entity_names=None, test_df=None,
     return df_model
 
 
-def nre_classification(df, models, test_df=None, standardize=False, benign_label='BENIGN', roc_curves=None,
+def nre_classification(df, models, df_test=None, standardize=False, benign_label='BENIGN', roc_curves=None,
                        test_size=0.33, seed=None, **kwargs):
     """
     Binary classification performance of Network Risk Estimation Method.
@@ -339,7 +336,7 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
     :param df: Canonical source dataframe that has flow information with timestamp, label and flow features. Each row
         is a flow
     :param models: model dictionary (name:classifier) to use in state identification
-    :param test_df: Test data in Canonical dataframe format
+    :param df_test: Test data in Canonical dataframe format
     :param standardize: If True, Standardizes risk estimate data in classification:param benign_label: Label of the benign, non-malicious, flows
     :param benign_label: Label of the benign, non-malicious, flows
     :param roc_curves: (only if plot_roc==True and smooth_roc==True) If given dictionary, adds the model roc_curves
@@ -354,8 +351,8 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
     # print(labels)
     ind = np.array(labels) != 'Empty'
 
-    if test_df is not None:
-        risk_mat_test, labels_test, _, _, _ = get_risk_mat_from_df(test_df, benign_label=benign_label,
+    if df_test is not None:
+        risk_mat_test, labels_test, _, _, _ = get_risk_mat_from_df(df_test, benign_label=benign_label,
                                                                    **kwargs)
         ind_test = np.array(labels_test) != 'Empty'
 
@@ -416,8 +413,7 @@ def nre_classification(df, models, test_df=None, standardize=False, benign_label
     return df_model
 
 
-# TODO: Both parsers might not be synced
-def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_names_fb=None, sub_net_size=None,
+def compare_among_conn_params(df, df_test=None, models=None, entity_names_nre=None, entity_names_fb=None, sub_net_size=None,
                               conn_params=None, conn_param_specs=None, standardize=False, best_op_point=True,
                               seed=None, control=False, **kwargs):
     """
@@ -425,6 +421,7 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
 
     :param df: Canonical source dataframe that has flow information with timestamp, label and flow features. Each row
         is a flow
+    :param df_test: Test data in Canonical dataframe format
     :param models: Machine Learning models to be used as classifiers in comparison
     :param entity_names_nre: List of entities that the flows are constrained to for NRE method
     :param entity_names_fb: List of entities that the flows are constrained to for Flow-based method. If None,
@@ -460,7 +457,7 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
         print('All features: ', feat_cols_all)
 
         flow_based_curves_control = {}
-        df_flow_control = flow_based_classification(df, models, entity_names=None, feat_cols=feat_cols_all,
+        df_flow_control = flow_based_classification(df, models, dt_test=df_test, entity_names=None, feat_cols=feat_cols_all,
                                                     roc_curves=flow_based_curves_control, standardize=standardize,
                                                     seed=seed, warn=not best_op_point, **kwargs)
         if best_op_point:
@@ -478,7 +475,7 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
 
     for conn_param in tqdm(conn_params):
         nre_curves = {}
-        df_nre = nre_classification(df, models, entity_names=entity_names_nre, conn_param=conn_param,
+        df_nre = nre_classification(df, models, df_test=df_test, entity_names=entity_names_nre, conn_param=conn_param,
                                     conn_param_specs=conn_param_specs, verbose=False, roc_curves=nre_curves,
                                     standardize=standardize, seed=seed, **kwargs)
         if best_op_point:
@@ -503,7 +500,7 @@ def compare_among_conn_params(df, models=None, entity_names_nre=None, entity_nam
         feat_cols = list({src_feat_col, dst_feat_col})
 
         flow_based_curves = {}
-        df_flow = flow_based_classification(df, models, entity_names=entity_names_fb,
+        df_flow = flow_based_classification(df, models, dt_test=df_test, entity_names=entity_names_fb,
                                             feat_cols=feat_cols, roc_curves=flow_based_curves, standardize=standardize,
                                             seed=seed, warn=not best_op_point, sub_net_size=sub_net_size, **kwargs)
         if best_op_point:

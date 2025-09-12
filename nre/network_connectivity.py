@@ -178,16 +178,18 @@ class ConnectivityUnit:
             n = 0
             temp = [0 for _ in sub_net_names]
             counts = np.zeros(len(sub_net_names))
+            feature_freq = [{} for _ in sub_net_names]
             for index, row in df.iterrows():
                 s_ind, d_ind = _get_s_d_ind(row, sub_net_names, node_ind_dict, idle_name=idle_name,
                                             src_id_col=src_id_col, dst_id_col=dst_id_col)
 
                 if conn_param is None:
                     # pass
-                    _update_sample(temp, row, counts, s_ind, d_ind, src_feature_col, dst_feature_col, method=method)
+                    _update_sample(temp, row, counts, s_ind, d_ind, src_feature_col, dst_feature_col,
+                                   feature_freq=feature_freq, method=method)
                 else:
                     kwargs = self.conn_param_specs[conn_param]
-                    _update_sample(temp, row, counts, s_ind, d_ind, **kwargs)
+                    _update_sample(temp, row, counts, s_ind, d_ind, feature_freq=feature_freq, **kwargs)
 
                 # Total Samples Count
                 num_appearances[s_ind] += 1
@@ -197,9 +199,10 @@ class ConnectivityUnit:
                 if n == conn_size:
                     temp.pop()  # Remove unused entry
                     samples.append(temp)
-                    temp = [0 for _ in sub_net_names]
                     n = 0
+                    temp = [0 for _ in sub_net_names]
                     counts = np.zeros(len(sub_net_names))
+                    feature_freq = [{} for _ in sub_net_names]
 
         sub_net_names.pop()
         num_appearances.pop()
@@ -618,9 +621,6 @@ def _update_sample(window_sample, flow_row, flow_counts, s_ind, d_ind, feature_f
     """
     if src_feature_col is None or dst_feature_col is None:
         assert method == 'activation', "'src_feature_col' or 'dst_feature_col' is not provided."
-    if method == 'mode':
-        assert feature_freq is not None, "Feature value frequencies must be provided for {} aggregation method".format(
-            method)
 
     if method == 'average':
         window_sample[s_ind] = (window_sample[s_ind] * flow_counts[s_ind] + float(flow_row[src_feature_col])) / (
@@ -633,15 +633,16 @@ def _update_sample(window_sample, flow_row, flow_counts, s_ind, d_ind, feature_f
     elif method == 'total':
         window_sample[s_ind] += float(flow_row[src_feature_col])
         window_sample[d_ind] += float(flow_row[dst_feature_col])
-    elif method == 'last':
-        window_sample[s_ind] = flow_row[src_feature_col]
-        window_sample[d_ind] = flow_row[dst_feature_col]
     elif method == 'mode':
+        assert feature_freq is not None, "Feature value frequencies must be provided for {} aggregation method".format(
+            method)
+
         src_val = flow_row[src_feature_col]
         dst_val = flow_row[dst_feature_col]
 
         if src_val not in feature_freq[s_ind]:
             feature_freq[s_ind][src_val] = 0
+
         if dst_val not in feature_freq[d_ind]:
             feature_freq[d_ind][dst_val] = 0
 
@@ -653,11 +654,15 @@ def _update_sample(window_sample, flow_row, flow_counts, s_ind, d_ind, feature_f
 
         window_sample[s_ind] = src_mode_val
         window_sample[d_ind] = dst_mode_val
+    elif method == 'last':
+        window_sample[s_ind] = flow_row[src_feature_col]
+        window_sample[d_ind] = flow_row[dst_feature_col]
+
     elif method == 'activation':
         window_sample[s_ind] = 1
         window_sample[d_ind] = 1
     else:
-        raise Exception("type must be in ['average', 'total', 'last', 'activation']")
+        raise Exception("type must be in ['average', 'total', 'mode', 'last', 'activation']")
 
 
 def get_mat_f_q_from_covariance(cov, signed=False):
