@@ -15,6 +15,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from tqdm import tqdm
+# import starbars
+from scipy.stats import ttest_rel
+from statannotations.Annotator import Annotator
 
 from nre.preprocess import preprocess_df
 from nre.time_windowed import get_window
@@ -542,6 +545,7 @@ def plot_perf_comparison(all_df, title='', perf_metric='Balanced Accuracy', peak
         all_df = peak_df.rename(columns={perf_metric: 'Peak ' + perf_metric})
         perf_metric = 'Peak ' + perf_metric
 
+    # print(all_df)
     sns.barplot(data=all_df, x='Connection Parameter', y=perf_metric, hue='Method', **kwargs)
     plt.xticks(rotation=45, ha='right')
     plt.title(title)
@@ -549,4 +553,66 @@ def plot_perf_comparison(all_df, title='', perf_metric='Balanced Accuracy', peak
     ax = plt.gca()
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
+    return plt.gcf()
+
+
+def plot_dataset_comparison(df_list, name_list, title='', perf_metric='Balanced Accuracy', peak_only=False,
+                            stat_test=True, **kwargs):
+    """
+    Plots the performance comparison of NRE and flow based method across datasets
+    """
+
+    comb_df = pd.DataFrame()
+    for i, df in enumerate(df_list[:]):
+        if peak_only:
+            new_cols = ['Connection Parameter', 'Method', perf_metric]
+            peak_df = pd.DataFrame(columns=new_cols)
+
+            for method in np.unique(df['Method']):
+                for conn_param in np.unique(df['Connection Parameter']):
+                    ind = (df['Method'] == method) & (df['Connection Parameter'] == conn_param)
+                    idx = df[ind][perf_metric].idxmax()
+                    temp_df = df.loc[idx, new_cols].to_frame().T
+                    peak_df = pd.concat((peak_df, temp_df), ignore_index=True)
+            df_list[i] = peak_df.rename(columns={perf_metric: 'Peak ' + perf_metric})
+            df = df_list[i]
+
+        df['Dataset'] = name_list[i]
+        comb_df = pd.concat((comb_df, df), ignore_index=True)
+
+    if peak_only:
+        perf_metric = 'Peak ' + perf_metric
+
+    sns.boxplot(data=comb_df, x='Dataset', y=perf_metric, hue='Method',  **kwargs)
+    plt.xticks(rotation=45)  # ha='right'
+    plt.title(title)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    ax = plt.gca()
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    if stat_test:
+
+        annotations = []
+        pairs = []
+        pvals = []
+        for i, df in enumerate(df_list):
+
+            arr_nre = df[df['Method'] == 'NRE'][perf_metric]
+            arr_fbnsi = df[df['Method'] == 'FBNSI'][perf_metric]
+            test_res = ttest_rel(arr_nre, arr_fbnsi)
+            pairs.append( ( (name_list[i], 'FBNSI'), (name_list[i], 'NRE') ) )
+            annotations.append(( name_list[i], name_list[i], test_res.pvalue))
+            pvals.append(test_res.pvalue)
+
+        print("P-values: ", pvals)
+
+
+        # TODO: Add stable stat results annotation
+        # starbars.draw_annotation(annotations)
+
+        # annotator = Annotator(ax, pairs, data=comb_df, x='Dataset', y=perf_metric, **kwargs)
+        # annotator.configure(test='Mann-Whitney', text_format='star', loc='outside')
+        # annotator.apply_and_annotate()
+
     return plt.gcf()

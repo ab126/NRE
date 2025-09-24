@@ -7,7 +7,6 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import pingouin as pg
 from filterpy.kalman import KalmanFilter
 from ordered_set import OrderedSet
 
@@ -375,8 +374,9 @@ class ConnectivityUnit:
                 norm_control_vals = norm_control_vals / np.std(norm_control_vals, axis=0)
                 data_df[cont_name] = norm_control_vals
 
-            # Compute
-            res_df = pg.pairwise_corr(data_df, method='pearson', covar=self.control_names)
+            # TODO: Compute
+            raise NotImplementedError('pcov method not implemented')
+            # res_df = pg.pairwise_corr(data_df, method='pearson', covar=self.control_names)
             mat_f = np.eye(len(self.names))
             for index, row in res_df.iterrows():
                 i = self.names.index(row['X'])

@@ -30,17 +30,15 @@ package whose adopted version can be found at [nre/npeet](https://github.com/ab1
 
 ### Manual Installation
 1. Download the repository, extract it into a working directory and setup the virtual environment. 
-
-2. Get the dependencies via
-`
-pip install -r requirements.txt
-`. 
-
-3. Finally install the package locally:
-
+   
+2. Install the package locally:
     ```
     pip install .
     ```
+3. Get the dependencies via
+   ```
+   pip install -r requirements.txt
+   ```
 
 _PyPI package coming soon_
 
