@@ -31,6 +31,7 @@ def validate_method(df_train, df_val, model, param_list):
     return auc_scores
 
 
+# TODO: Modularize the validation notebook
 def cross_validate_model(df, k_fold=10, ts=False):
     """ Performs k fold cross-validation on the flow data. If ts=True performs timeseries k-fold cross-validation split
      instead"""

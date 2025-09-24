@@ -73,7 +73,7 @@ def graph_evol(all_graphs, forget_factor):
     return curr_graphs
 
 
-# TODO: Simplifies related functions with single_step_update below, add docstring
+# TODO: Simplify related functions with single_step_update below, add docstring
 
 
 def graphs_2_risk_scores(all_graphs, all_measurements=None, all_mat_h=None, mat_x_init=None, mat_p_init=None,
@@ -441,7 +441,6 @@ def get_risk_mat_from_df(df, forget_factor=0.5, k_steps=1, relief_factor=0.2, re
 def stream_df_to_jsonstring(df, forget_factor=0.5, k_steps=1, relief_factor=0.2, return_cov=False, return_datetimes=False,
                          timeit=False, **kwargs):
     """ Returns the string encoding risk estimates and mat_f to be used in dynamic rendering """
-
 
 
 # Making GIF
