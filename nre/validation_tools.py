@@ -17,7 +17,7 @@ def validate_method(df_train, df_val, model, param_list):
     for params in tqdm(param_list):
         roc_curves = {}
         try:
-            _ = model(df_train, ml_models, test_df=df_val, roc_curves=roc_curves, **params)
+            _ = model(df_train, ml_models, df_test=df_val, roc_curves=roc_curves, **params)
         except AssertionError as e:
             warnings.warn("Assertion Error: \n{}".format(e))
             continue
