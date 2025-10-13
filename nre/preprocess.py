@@ -39,13 +39,14 @@ def get_act_cols(df):
     return temp_df
 
 
-def preprocess_df(df_input, date_col, dtype_dict=None, ds_type=None):
+def preprocess_df(df_input, date_col, label_col=None, dtype_dict=None, ds_type=None):
     """
     Preprocess the dataframe into a canonical form. Assigns dtypes to columns, checks for repeated columns, discards
     rows with NaN or Inf values and sorts the entries/rows by date_col.
     --------------------
     :param df_input: Raw DataFrame to be formatted.
     :param date_col: Column of df_input that will be mapped to datetime object and will be used for sorting rows.
+    :param label_col: Casts the label column into str
     :param dtype_dict: (optional) Dictionary of column_name : dtype that specifies the formatting dtype of each column.
     :param ds_type: Dataset type that is used in analysis. Available values ['cic-ids', 'ton-iot']
     :return:
@@ -65,9 +66,13 @@ def preprocess_df(df_input, date_col, dtype_dict=None, ds_type=None):
 
     if ds_type == 'ton-iot' or ds_type == 'ton' or ds_type == 'iot':
         df[date_col] = pd.to_datetime(df[date_col], unit='ms')
+        label_col = 'Label'
     else:
         df[date_col] = pd.to_datetime(df[date_col])
     df = df.sort_values(by=[date_col])
+
+    if label_col:
+        df[label_col] = df[label_col].astype(str)
     return df
 
 

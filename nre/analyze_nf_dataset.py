@@ -147,6 +147,7 @@ def flow_data_parser(df, entity_names=None, sub_net_size=None, feat_cols=(' Tota
         label_counts.append(temp_counts.copy())
 
         if labelling_opt == 'attacks first':
+
             if len(temp_counts) == 1:
                 labels.append(str(list(temp_counts.keys())[0]))
             else:
@@ -156,9 +157,11 @@ def flow_data_parser(df, entity_names=None, sub_net_size=None, feat_cols=(' Tota
                     pass
                 ind = np.argmax(list(temp_counts.values()))
                 labels.append(str(list(temp_counts.keys())[ind]))
-        else:  # Majority labelling
+        elif labelling_opt == 'majority':  # Majority labelling
             ind = np.argmax(list(temp_counts.values()))
             labels.append(str(list(temp_counts.keys())[ind]))
+        else:
+            raise AssertionError("labelling_opt must be in ['attacks first', 'majority']")
 
     return flow_data, labels, label_counts
 
@@ -241,8 +244,9 @@ def flow_based_classification(df, models, df_test=None, entity_names=None,
     flow_data, labels, label_counts = flow_data_parser(df, entity_names=entity_names, feat_cols=feat_cols,
                                                        benign_label=benign_label, labelling_opt=labelling_opt,
                                                        seed=seed, **kwargs)
-    # print(labels)
 
+    #print(label_counts)
+    assert len(np.unique(labels)) > 1, "Number of classes are less than 2 ()".format(np.unique(labels))
 
     if df_test is not None:
         flow_data_test, labels_test, label_counts_test = flow_data_parser(df_test, entity_names=entity_names,
@@ -351,7 +355,9 @@ def nre_classification(df, models, df_test=None, standardize=False, benign_label
 
    """
     risk_mat, labels, _, _, _ = get_risk_mat_from_df(df, benign_label=benign_label, **kwargs)
-    # print(labels)
+
+    assert len(np.unique(labels)) > 1, "Number of classes are less than 2 ()".format(np.unique(labels))
+
     ind = np.array(labels) != 'Empty'
 
     if df_test is not None:
@@ -382,8 +388,6 @@ def nre_classification(df, models, df_test=None, standardize=False, benign_label
         mat_x_test = ss_train.transform(mat_x_test)
 
     # print(np.unique(y_train, return_counts=True))
-    if len(np.unique(y_train)) == 1:
-        raise AssertionError("For the parameter set given, there is only single class of network state. \n {}".format(kwargs))
     accuracy, precision, recall, b_acc, f1, auc_score = {}, {}, {}, {}, {}, {}
     for mdl in models.keys():
         # Fit the classifier

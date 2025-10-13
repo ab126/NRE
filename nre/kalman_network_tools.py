@@ -361,10 +361,12 @@ def parse_df_2_state_graphs(df, entity_names=None, method='cov', window_type='ti
                     pass
                 ind = np.argmax(list(temp_counts.values()))
                 labels.append(str(list(temp_counts.keys())[ind]))
-        else:  # Majority labelling
+        elif labelling_opt == 'majority':  # Majority labelling
             ind = np.argmax(list(temp_counts.values()))
             lbl = str(list(temp_counts.keys())[ind])
             labels.append(lbl)
+        else:
+            raise AssertionError("labelling_opt must be in ['attacks first', 'majority']")
 
         # Running times
         if timeit:
