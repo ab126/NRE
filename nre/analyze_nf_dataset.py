@@ -563,7 +563,7 @@ def plot_perf_comparison(all_df, title='', perf_metric='Balanced Accuracy', peak
 def plot_dataset_comparison(df_list, name_list, title='', perf_metric='Balanced Accuracy', peak_only=False,
                             stat_test=True, **kwargs):
     """
-    Plots the performance comparison of NRE and flow based method across datasets
+    Plots the performance comparison of NRE and flow-based method across datasets combining connection parameters
     """
 
     comb_df = pd.DataFrame()

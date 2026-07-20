@@ -1,12 +1,12 @@
-/tests/.ipynb_checkpoints/
-/tests/figures/
-/tests/saves/
+.idea/
+.parcel-cache/
+.vscode/
+__pycache__/
+node_modules/
+venv/
 
-/tests/draw_network.ipynb
-/tests/classification_experiment.ipynb
-/nre/network_rendering/saves/
-/nre/network_rendering/python/py2js.py
-/nre/network_rendering/misc/
-/nre/tests/.ipynb_checkpoints/
 /nre/tests/saves/
-/nre/network_rendering/webpages/nre-web/src/saves/
+/nre/tests/stream_data/
+/nre/network_rendering/saves
+/nre/network_rendering/test/stream_data
+

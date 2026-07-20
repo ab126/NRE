@@ -28,8 +28,8 @@ also requires [npeet](https://github.com/gregversteeg/NPEET) [2]
 package whose adopted version can be found at [nre/npeet](https://github.com/ab126/NRE/tree/main/nre/npeet).
 
 
-### Manual Installation
-1. Download the repository, extract it into a working directory and setup the virtual environment. 
+### Installation
+1. Download the repository, extract it into a working directory and set up a virtual environment. 
    
 2. Install the package locally:
     ```
@@ -39,8 +39,6 @@ package whose adopted version can be found at [nre/npeet](https://github.com/ab1
    ```
    pip install -r requirements.txt
    ```
-
-_PyPI package coming soon_
 
 ### Working Example
 This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/nre/tests/test_working_example.py).
