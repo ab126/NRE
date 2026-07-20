@@ -1,0 +1,3 @@
+[submodule "nre/network_rendering/webpages/nre-web"]
+	path = nre/network_rendering/webpages/nre-web
+	url = https://github.com/ab126/NRE-web.git
