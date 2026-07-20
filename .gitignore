@@ -10,3 +10,6 @@ venv/
 /nre/network_rendering/saves
 /nre/network_rendering/test/stream_data
 
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
