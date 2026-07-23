@@ -28,17 +28,29 @@ also requires [npeet](https://github.com/gregversteeg/NPEET) [2]
 package whose adopted version can be found at [nre/npeet](https://github.com/ab126/NRE/tree/main/nre/npeet).
 
 
-### Installation
-1. Download the repository, extract it into a working directory and set up a virtual environment. 
-   
-2. Install the package locally:
-    ```
-    pip install .
-    ```
-3. Get the dependencies via
-   ```
-   pip install -r requirements.txt
-   ```
+## Installation
+
+NRE requires Python 3.10 or later.
+
+### Install directly from GitHub
+
+```bash
+python -m pip install git+https://github.com/ab126/NRE.git
+```
+
+### Install from a local clone
+
+```bash
+git clone https://github.com/ab126/NRE.git
+cd NRE
+python -m pip install .
+```
+
+### Verify the installation
+
+```bash
+python -c "import nre; print('NRE installed successfully')"
+```
 
 ### Working Example
 This example can be found in [test_working_example.py](https://github.com/ab126/NRE/blob/main/nre/tests/test_working_example.py).

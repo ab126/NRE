@@ -1,21 +1,67 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "nre"
-version = "0.0.1"
-authors = [
-  { name="Arda Bayer", email="bayerarda@gmail.com" },
-]
-description = "Network Risk Estimation"
+name = "network-risk-estimation"
+version = "1.0.0"
+description = "Real-time probabilistic network risk estimation using entity relationships and active measurements."
 readme = "README.md"
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
+
+authors = [
+    { name = "Arda Bayer" }
+]
+
+keywords = [
+    "network risk estimation",
+    "cybersecurity",
+    "network analysis",
+    "probabilistic modeling",
+    "risk estimation"
+]
+
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Security"
+]
+
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "scipy",
+    "ordered-set",
+    "filterpy",
+    "tqdm",
+    "matplotlib",
+    "seaborn",
+    "networkx",
+    "pillow",
+    "pingouin"
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "pytest",
+    "ruff"
 ]
 
 [project.urls]
-Homepage = "https://github.com/ab126/NRE.git"
+Homepage = "https://github.com/ab126/NRE"
+Repository = "https://github.com/ab126/NRE"
+Issues = "https://github.com/ab126/NRE/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nre"]
+

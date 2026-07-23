@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use NRE in your research, please cite this software."
+title: "Network Risk Estimation"
+type: software
+version: 1.0.0
+date-released: 2026-07-23
+license: MIT
+
+authors:
+  - family-names: Bayer
+    given-names: Arda
+    affiliation: Rice University
+    orcid: "https://orcid.org/0009-0004-4772-5188"
+
+abstract: >
+  NRE is a Python implementation of a real-time probabilistic network
+  risk estimator based on entity relationships in connection data and
+  active measurements over a set of entities.
+
+repository-code: "https://github.com/ab126/NRE"
+
+keywords:
+  - network risk estimation
+  - cybersecurity
+  - network analysis
+  - probabilistic modeling
