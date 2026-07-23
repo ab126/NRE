@@ -1,4 +1,7 @@
 # Network Risk Estimation (NRE)
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21520902.svg)](https://doi.org/10.5281/zenodo.21520902)
+
 This code is provided as an implementation of our work 
 network risk estimation (NRE) which is a real-time probabilistic 
 risk estimator based on entity relationships in connection data 
@@ -81,6 +84,21 @@ nm.update_new_tick_conn_data(df, src_id_col=' Source ID', dst_id_col=' Destinati
                              src_feature_col=' Source Flow Attribute', dst_feature_col=' Destination Flow Attribute',
                              sync_window_size=20, time_scale='sec', keep_unit=True)
 mat_x, mat_p = nm.mat_x, nm.mat_p
+```
+
+## Citation
+
+If you use NRE in your research, please cite the software:
+
+```bibtex
+@software{bayer2026nre,
+  author  = {Arda Bayer},
+  title   = {Network Risk Estimation (NRE)},
+  year    = {2026},
+  version = {1.0.0},
+  doi     = {10.5281/zenodo.21520902},
+  url     = {https://doi.org/10.5281/zenodo.21520902}
+}
 ```
 
 ## License
